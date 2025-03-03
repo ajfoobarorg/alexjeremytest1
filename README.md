@@ -7,6 +7,10 @@ Our first shared repo
 cd frontend
 bun run dev
 ```
+and in another terminal:
+```
+cd backend && uvicorn main:app --reload
+```
 
 # Local setup
 ```

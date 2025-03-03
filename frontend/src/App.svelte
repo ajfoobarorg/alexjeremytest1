@@ -1,4 +1,11 @@
 <script>
+  import { currentPath } from './router.js';
+  import Home from './Home.svelte';
+  import Game from './Game.svelte';
+
+  $: path = $currentPath;
+  $: gameId = path.startsWith('/game/') ? path.split('/game/')[1] : null;
+
   let board = Array(9).fill("");
   let currentPlayer = "X";
   let winner = null;
@@ -50,83 +57,19 @@
 </script>
 
 <main>
-  <h1>Tic Tac Toe</h1>
-  
-  <div class="status">
-    {#if winner}
-      Winner: {winner}
-    {:else if gameOver}
-      Game Over - Draw!
-    {:else}
-      Current player: {currentPlayer}
-    {/if}
-  </div>
-
-  <div class="board">
-    {#each board as cell, i}
-      <button class="cell" on:click={() => makeMove(i)}>
-        {cell}
-      </button>
-    {/each}
-  </div>
-
-  <button class="reset" on:click={resetGame}>Reset Game</button>
+  {#if path === '/'}
+    <Home />
+  {:else if gameId}
+    <Game {gameId} />
+  {:else}
+    <p>Page not found</p>
+  {/if}
 </main>
 
 <style>
-  main {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 2rem;
+  :global(body) {
+    margin: 0;
     font-family: Arial, sans-serif;
-  }
-
-  h1 {
-    color: #333;
-    margin-bottom: 2rem;
-  }
-
-  .status {
-    margin-bottom: 2rem;
-    font-size: 1.2rem;
-    font-weight: bold;
-  }
-
-  .board {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 2rem;
-  }
-
-  .cell {
-    width: 100px;
-    height: 100px;
-    font-size: 2rem;
-    font-weight: bold;
-    border: 2px solid #333;
-    background: white;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-
-  .cell:hover {
-    background-color: #f0f0f0;
-  }
-
-  .reset {
-    padding: 0.8rem 1.5rem;
-    font-size: 1rem;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-
-  .reset:hover {
-    background-color: #45a049;
+    background-color: #f9f9f9;
   }
 </style> 
