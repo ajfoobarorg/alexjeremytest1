@@ -16,7 +16,6 @@ bun run dev
 ```
 # Bun is a javascript package manager (similar to npm)
 curl -fsSL https://bun.sh/install | bash
-# add ~/.bun/bin to your $PATH (.zshrc)
 cd frontend && bun install
 ```
 
