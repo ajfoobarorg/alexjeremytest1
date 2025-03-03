@@ -2,10 +2,6 @@
 Our first shared repo
 
 
-This is alex's first commit from his laptop -- will push back to github.com
-
-TODO(jeremy): write code
-
 # How to run
 ```
 cd frontend
@@ -17,6 +13,30 @@ bun run dev
 # Bun is a javascript package manager (similar to npm)
 curl -fsSL https://bun.sh/install | bash
 cd frontend && bun install
+```
+
+# Python setup
+*Doesn't work on python 3.13, use 3.12*
+```
+python3.12 -m venv ~/python-environments/alexjeremy
+~/python-environments/alexjeremy/bin/activate
+```
+To get out of the environment, run `deactivate`
+
+Then configure Cursor:
+1. Cmd-Shift-P (palette)
+2. Python: Select Interpreter
+3. Enter path to ~/python-environments/alexjeremy/bin/python
+
+# Pydantic Setup
+One of our `pip` packages needs `pydantic`, which needs Rust and its package manager Cargo:
+```
+curl https://sh.rustup.rs -sSf | sh
+```
+
+# Pip package install
+```
+pip install -r requirements.txt
 ```
 
 # Cursor extensions
