@@ -23,7 +23,7 @@ cd frontend && bun install
 *Doesn't work on python 3.13, use 3.12*
 ```
 python3.12 -m venv ~/python-environments/alexjeremy
-~/python-environments/alexjeremy/bin/activate
+. ~/python-environments/alexjeremy/bin/activate
 ```
 To get out of the environment, run `deactivate`
 
