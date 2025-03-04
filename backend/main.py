@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 import uuid
 from datetime import datetime
-
+import sys
 app = FastAPI()
 
 # Enable CORS
@@ -101,7 +101,7 @@ async def get_public_games():
 
 @app.get("/")
 def read_root():
-    return {"Hello World": "If you see this message it means auto-deply from github's main branch is working!"}
+    return {"Hello World": "Oh and python version is " + sys.version}
 
 @app.get("/games/{game_id}")
 async def get_game(game_id: str):
