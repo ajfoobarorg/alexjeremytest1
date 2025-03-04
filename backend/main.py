@@ -99,6 +99,10 @@ async def get_public_games():
                    if game.is_public and not game.game_over and game.player_o is None]
     return public_games
 
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
+
 @app.get("/games/{game_id}")
 async def get_game(game_id: str):
     if game_id not in games:
