@@ -6,7 +6,8 @@
 
   export let gameId;
 
-  let board = Array(9).fill("");
+  let boards = Array(9).fill(null).map(() => Array(9).fill(""));
+  let metaBoard = Array(9).fill("");
   let currentPlayer = "X";
   let winner = null;
   let gameOver = false;
@@ -18,6 +19,7 @@
   let gameName = "";
   let playerXName = null;
   let playerOName = null;
+  let nextBoard = null;
 
   // Reset hasTriedToJoin when playerName changes
   $: if ($playerName) {
@@ -52,13 +54,15 @@
     try {
       const response = await fetch(`http://localhost:8000/games/${gameId}`);
       const data = await response.json();
-      board = data.board;
+      boards = data.boards;
+      metaBoard = data.meta_board;
       currentPlayer = data.current_player;
       winner = data.winner;
       gameOver = data.game_over;
       gameName = data.name;
       playerXName = data.player_x_name;
       playerOName = data.player_o_name;
+      nextBoard = data.next_board;
       
       // Reset player state
       isPlayer = false;
@@ -87,24 +91,46 @@
     }
   }
 
-  async function makeMove(position) {
+  async function makeMove(boardIndex, position) {
     if (!isPlayer || currentPlayer !== playerSymbol) return;
+    if (nextBoard !== null && nextBoard !== boardIndex) return;
+    if (metaBoard[boardIndex] !== "") return;
     
     try {
-      const response = await fetch(`http://localhost:8000/games/${gameId}/move/${position}?player_id=${$playerId}`, {
+      const response = await fetch(`http://localhost:8000/games/${gameId}/move/${boardIndex}/${position}?player_id=${$playerId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         }
       });
       const data = await response.json();
-      board = data.board;
+      boards = data.boards;
+      metaBoard = data.meta_board;
       currentPlayer = data.current_player;
       winner = data.winner;
       gameOver = data.game_over;
+      nextBoard = data.next_board;
     } catch (error) {
       console.error('Error making move:', error);
     }
+  }
+
+  function isBoardPlayable(boardIndex) {
+    return (nextBoard === null || nextBoard === boardIndex) && 
+           metaBoard[boardIndex] === "" &&
+           !isBoardFull(boardIndex);
+  }
+
+  function isBoardFull(boardIndex) {
+    return !boards[boardIndex].includes("");
+  }
+
+  function getBoardClass(boardIndex) {
+    let classes = ['small-board'];
+    if (isBoardPlayable(boardIndex)) classes.push('playable');
+    if (nextBoard === boardIndex) classes.push('active');
+    if (metaBoard[boardIndex]) classes.push('completed');
+    return classes.join(' ');
   }
 
   function copyGameUrl() {
@@ -162,20 +188,35 @@
       {/if}
     {:else if currentPlayer === playerSymbol}
       Your turn ({playerSymbol})
+      {#if nextBoard !== null}
+        - Must play in board {nextBoard + 1}
+      {:else}
+        - You can play in any available board
+      {/if}
     {:else}
       Waiting for {currentPlayer === 'X' ? playerXName : playerOName} to move...
     {/if}
   </div>
 
-  <div class="board">
-    {#each board as cell, i}
-      <button 
-        class="cell" 
-        on:click={() => makeMove(i)}
-        disabled={!isPlayer || currentPlayer !== playerSymbol || cell || gameOver}
-      >
-        {cell}
-      </button>
+  <div class="super-board {winner ? winner.toLowerCase() : ''}">
+    {#each Array(9) as _, boardIndex}
+      <div class={getBoardClass(boardIndex)}>
+        {#if metaBoard[boardIndex]}
+          <div class="board-winner {metaBoard[boardIndex].toLowerCase()}">
+            {metaBoard[boardIndex] === 'T' ? 'Tie' : metaBoard[boardIndex]}
+          </div>
+        {:else}
+          {#each boards[boardIndex] as cell, position}
+            <button 
+              class="cell {cell.toLowerCase()}" 
+              on:click={() => makeMove(boardIndex, position)}
+              disabled={!isPlayer || currentPlayer !== playerSymbol || cell || !isBoardPlayable(boardIndex)}
+            >
+              {cell}
+            </button>
+          {/each}
+        {/if}
+      </div>
     {/each}
   </div>
 </main>
@@ -216,11 +257,11 @@
   }
 
   .player-x {
-    color: #2196F3;
+    color: #4CAF50;  /* Green for X */
   }
 
   .player-o {
-    color: #f44336;
+    color: #2196F3;  /* Blue for O */
   }
 
   .status {
@@ -229,31 +270,146 @@
     font-weight: bold;
   }
 
-  .board {
+  .super-board {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 20px;
     margin-bottom: 2rem;
+    padding: 20px;
+    background: #f0f0f0;
+    border-radius: 8px;
+    border: 3px solid #9e9e9e;  /* Default gray border */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);  /* Nice shadow for meta board */
+  }
+
+  /* Add winner colors for meta board */
+  .super-board.x {
+    border-color: #2e7d32;  /* Darker green for X winner */
+    box-shadow: 0 4px 12px rgba(46, 125, 50, 0.2);
+  }
+
+  .super-board.o {
+    border-color: #1565c0;  /* Darker blue for O winner */
+    box-shadow: 0 4px 12px rgba(21, 101, 192, 0.2);
+  }
+
+  .small-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 8px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    opacity: 0.5;
+    cursor: not-allowed;
+    position: relative;
+    border: 2px solid #9e9e9e;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);  /* Subtle shadow for all boards */
+  }
+
+  .small-board.playable {
+    background: #fff;
+    opacity: 1;
+    border-color: #757575;  /* Darker gray for playable boards */
+    cursor: pointer;
+  }
+
+  .small-board.active {
+    background: #fff;
+    opacity: 1;
+    border-color: #424242;  /* Even darker gray for active board */
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+    50% { box-shadow: 0 0 15px rgba(0, 0, 0, 0.2); }
+    100% { box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+  }
+
+  .small-board.completed {
+    opacity: 1;
+    cursor: not-allowed;
+  }
+
+  .small-board.completed .cell {
+    background: #e0e0e0;  /* Darker background for cells in completed boards */
+    border-color: #bdbdbd;
+  }
+
+  .board-winner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 4rem;
+    font-weight: bold;
+    text-align: center;
+    border-radius: 4px;
+  }
+
+  .board-winner.x {
+    color: #2e7d32;  /* Darker green */
+    background: rgba(76, 175, 80, 0.15);
+    border: 3px solid #2e7d32;
+  }
+
+  .board-winner.o {
+    color: #1565c0;  /* Darker blue */
+    background: rgba(33, 150, 243, 0.15);
+    border: 3px solid #1565c0;
+  }
+
+  .board-winner.t {
+    color: #424242;  /* Darker gray */
+    background: rgba(117, 117, 117, 0.15);
+    border: 3px solid #424242;
   }
 
   .cell {
-    width: 100px;
-    height: 100px;
-    font-size: 2rem;
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
     font-weight: bold;
-    border: 2px solid #333;
+    border: 1px solid #ccc;
     background: white;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-
-  .cell:not(:disabled):hover {
-    background-color: #f0f0f0;
+    transition: all 0.2s;
+    color: #757575;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    line-height: 1;
   }
 
   .cell:disabled {
     cursor: not-allowed;
-    opacity: 0.8;
+    background: #e0e0e0;  /* Darker background for disabled cells */
+  }
+
+  .cell:not(:disabled) {
+    cursor: pointer;
+  }
+
+  .cell.x {
+    color: #2e7d32;  /* Darker green */
+    border-color: rgba(46, 125, 50, 0.3);
+  }
+
+  .cell.o {
+    color: #1565c0;  /* Darker blue */
+    border-color: rgba(21, 101, 192, 0.3);
+  }
+
+  .cell:not(:disabled):hover {
+    background-color: #f0f0f0;
+    transform: scale(1.05);
   }
 
   button {
