@@ -1,6 +1,13 @@
 # Alex Jeremy Test 1
 Our first shared repo
 
+# Arch notes
+Backend is FastAPI (a python backend)
+
+FE is Svelte, served for development via vite.
+
+No CSS framework yet (consider Tailwind)
+
 
 # How to run
 ```
@@ -28,9 +35,10 @@ python3.12 -m venv ~/python-environments/alexjeremy
 To get out of the environment, run `deactivate`
 
 Then configure Cursor:
+
 1. Cmd-Shift-P (palette)
-2. Python: Select Interpreter
-3. Enter path to ~/python-environments/alexjeremy/bin/python
+1. Python: Select Interpreter
+1. Enter path to ~/python-environments/alexjeremy/bin/python
 
 # Pydantic Setup
 One of our `pip` packages needs `pydantic`, which needs Rust and its package manager Cargo:
