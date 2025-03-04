@@ -101,7 +101,7 @@ async def get_public_games():
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"Hello World": "If you see this message it means auto-deply from github's main branch is working!"}
 
 @app.get("/games/{game_id}")
 async def get_game(game_id: str):
