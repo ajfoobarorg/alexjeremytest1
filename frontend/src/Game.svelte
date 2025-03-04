@@ -1,8 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { playerId, playerName } from './stores.js';
+  import { playerId, playerName, playerStats, updatePlayerStats } from './stores.js';
   import { navigate } from './router.js';
   import PlayerNameModal from './PlayerNameModal.svelte';
+  import GameEndModal from './GameEndModal.svelte';
 
   export let gameId;
 
@@ -20,10 +21,22 @@
   let playerXName = null;
   let playerOName = null;
   let nextBoard = null;
+  let showGameEndModal = false;
+  let opponentStats = null;
 
   // Reset hasTriedToJoin when playerName changes
   $: if ($playerName) {
     hasTriedToJoin = false;
+  }
+
+  // Show game end modal when game is over
+  $: if (gameOver && !showGameEndModal) {
+    if (isPlayer) {
+      const result = winner === playerSymbol ? 'win' : 
+                    winner === null ? 'draw' : 'loss';
+      updatePlayerStats(result);
+      showGameEndModal = true;
+    }
   }
 
   async function tryJoinGame() {
@@ -169,9 +182,21 @@
   <div class="players">
     <div class="player player-x">
       <strong>Player X:</strong> {playerXName || 'Waiting...'}
+      {#if playerXName}
+        <div class="player-stats">
+          <span>Wins: {$playerStats.wins}</span>
+          <span>Win Rate: {(($playerStats.wins / $playerStats.totalGames) * 100).toFixed(1)}%</span>
+        </div>
+      {/if}
     </div>
     <div class="player player-o">
       <strong>Player O:</strong> {playerOName || 'Waiting...'}
+      {#if playerOName}
+        <div class="player-stats">
+          <span>Wins: {opponentStats?.wins || 0}</span>
+          <span>Win Rate: {((opponentStats?.wins || 0) / (opponentStats?.totalGames || 1) * 100).toFixed(1)}%</span>
+        </div>
+      {/if}
     </div>
   </div>
 
@@ -219,6 +244,15 @@
       </div>
     {/each}
   </div>
+
+  {#if showGameEndModal}
+    <GameEndModal
+      isWinner={winner === playerSymbol}
+      isDraw={gameOver && !winner}
+      playerName={$playerName}
+      stats={$playerStats}
+    />
+  {/if}
 </main>
 {/if}
 
@@ -262,6 +296,14 @@
 
   .player-o {
     color: #2196F3;  /* Blue for O */
+  }
+
+  .player-stats {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #666;
+    display: flex;
+    gap: 1rem;
   }
 
   .status {

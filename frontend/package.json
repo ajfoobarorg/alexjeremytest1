@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "canvas-confetti": "^1.9.2",
     "svelte": "^4.2.11"
   },
   "devDependencies": {

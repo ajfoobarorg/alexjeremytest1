@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { navigate } from './router.js';
-  import { playerId, playerName } from './stores.js';
+  import { playerId, playerName, playerStats } from './stores.js';
   import PlayerNameModal from './PlayerNameModal.svelte';
 
   let publicGames = [];
@@ -102,14 +102,66 @@
     <p>Welcome, {$playerName}!</p>
   </div>
 
-  <div class="stats">
-    <h2>Game Statistics</h2>
-    <p>Total Games: {stats.total_games}</p>
-    <p>Ongoing Games: {stats.ongoing_games}</p>
-    <p>Completed Games: {stats.completed_games}</p>
-    <p>X Wins: {stats.x_wins}</p>
-    <p>O Wins: {stats.o_wins}</p>
-    <p>Draws: {stats.draws}</p>
+  <div class="stats-container">
+    <div class="stats">
+      <h2>Global Scores</h2>
+      <div class="stat-grid">
+        <div class="stat-item">
+          <span class="label">Total Games</span>
+          <span class="value">{stats.total_games}</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Ongoing Games</span>
+          <span class="value">{stats.ongoing_games}</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">X Wins</span>
+          <span class="value">{stats.x_wins}</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">O Wins</span>
+          <span class="value">{stats.o_wins}</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Draws</span>
+          <span class="value">{stats.draws}</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Completed</span>
+          <span class="value">{stats.completed_games}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats personal">
+      <h2>Your Scores</h2>
+      <div class="stat-grid">
+        <div class="stat-item">
+          <span class="label">Total Games</span>
+          <span class="value">{$playerStats.totalGames}</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Wins</span>
+          <span class="value">{$playerStats.wins}</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Losses</span>
+          <span class="value">{$playerStats.losses}</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Draws</span>
+          <span class="value">{$playerStats.draws}</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Win Rate</span>
+          <span class="value">{(($playerStats.wins / ($playerStats.totalGames || 1)) * 100).toFixed(1)}%</span>
+        </div>
+        <div class="stat-item highlight">
+          <span class="label">Best Streak</span>
+          <span class="value">Coming soon!</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="new-game">
@@ -179,15 +231,60 @@
     margin-bottom: 2rem;
   }
 
-  .stats {
-    background: #f5f5f5;
-    padding: 1rem;
-    border-radius: 8px;
+  .stats-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    width: 100%;
     margin-bottom: 2rem;
   }
 
-  .stats p {
-    margin: 0.5rem 0;
+  .stats {
+    background: #f5f5f5;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .stats.personal {
+    background: #e8f5e9;  /* Light green background for personal stats */
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .stat-item {
+    background: white;
+    padding: 1rem;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
+  }
+
+  .stat-item:hover {
+    transform: translateY(-2px);
+  }
+
+  .stat-item.highlight {
+    border: 2px solid #4CAF50;
+  }
+
+  .label {
+    display: block;
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #2e7d32;
   }
 
   .new-game {
