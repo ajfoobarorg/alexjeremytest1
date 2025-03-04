@@ -35,6 +35,7 @@ class GameStats(BaseModel):
     completed_games: int = 0
     x_wins: int = 0
     o_wins: int = 0
+    draws: int = 0
     ongoing_games: int = 0
 
 class NewGameRequest(BaseModel):
@@ -154,6 +155,7 @@ async def make_move(game_id: str, position: int, player_id: str):
         game.game_over = True
         stats.completed_games += 1
         stats.ongoing_games -= 1
+        stats.draws += 1
     else:
         # Switch player
         game.current_player = "O" if game.current_player == "X" else "X"

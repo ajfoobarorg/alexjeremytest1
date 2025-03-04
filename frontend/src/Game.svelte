@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { playerId, playerName } from './stores.js';
   import { navigate } from './router.js';
+  import PlayerNameModal from './PlayerNameModal.svelte';
 
   export let gameId;
 
@@ -17,6 +18,11 @@
   let gameName = "";
   let playerXName = null;
   let playerOName = null;
+
+  // Reset hasTriedToJoin when playerName changes
+  $: if ($playerName) {
+    hasTriedToJoin = false;
+  }
 
   async function tryJoinGame() {
     if (!$playerName) return false;
@@ -65,7 +71,7 @@
       } else if (data.player_o === $playerId) {
         isPlayer = true;
         playerSymbol = "O";
-      } else if (!hasTriedToJoin && !data.player_o && !gameOver) {
+      } else if (!hasTriedToJoin && !data.player_o && !gameOver && $playerName) {
         hasTriedToJoin = true;
         const joined = await tryJoinGame();
         if (joined) {
@@ -121,6 +127,9 @@
   });
 </script>
 
+{#if !$playerName}
+  <PlayerNameModal />
+{:else}
 <main>
   <h1>{gameName}</h1>
   
@@ -170,6 +179,7 @@
     {/each}
   </div>
 </main>
+{/if}
 
 <style>
   main {

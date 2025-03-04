@@ -109,6 +109,7 @@
     <p>Completed Games: {stats.completed_games}</p>
     <p>X Wins: {stats.x_wins}</p>
     <p>O Wins: {stats.o_wins}</p>
+    <p>Draws: {stats.draws}</p>
   </div>
 
   <div class="new-game">
