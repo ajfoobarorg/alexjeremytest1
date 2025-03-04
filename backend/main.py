@@ -101,7 +101,7 @@ async def get_public_games():
 
 @app.get("/")
 def read_root():
-    return {"Hello World": "Oh and python version is " + sys.version}
+    return {"Hello World": "Quick test. Oh and python version is " + sys.version}
 
 @app.get("/games/{game_id}")
 async def get_game(game_id: str):
