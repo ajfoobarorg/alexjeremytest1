@@ -97,14 +97,17 @@ class GameState(BaseModel):
         """Override dict method to include boards in API response."""
         result = super().dict(*args, **kwargs)
         # Convert _boards to list of lists for API
-        boards_list = []
-        for board in self._boards:
-            board_list = board.to_list()
-            # Ensure it's a list of strings
-            if not isinstance(board_list, list):
-                board_list = ["" for _ in range(9)]
-            boards_list.append(board_list)
-        result["boards"] = boards_list
+        result["boards"] = [board.to_list() for board in self._boards]
+        # Remove private field from response
+        if "_boards" in result:
+            del result["_boards"]
+        return result
+    
+    def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
+        """Override model_dump method for newer Pydantic versions."""
+        result = super().model_dump(*args, **kwargs) if hasattr(super(), "model_dump") else super().dict(*args, **kwargs)
+        # Convert _boards to list of lists for API
+        result["boards"] = [board.to_list() for board in self._boards]
         # Remove private field from response
         if "_boards" in result:
             del result["_boards"]
@@ -115,16 +118,6 @@ class GameState(BaseModel):
         if not 0 <= index <= 8:
             raise ValueError("Board index must be between 0 and 8")
         return self._boards[index]
-
-    def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
-        """Override model_dump method for newer Pydantic versions."""
-        result = super().model_dump(*args, **kwargs) if hasattr(super(), "model_dump") else super().dict(*args, **kwargs)
-        # Convert _boards to list of lists for API
-        result["boards"] = [board.to_list() for board in self._boards]
-        # Remove private field from response
-        if "_boards" in result:
-            del result["_boards"]
-        return result
 
 class GameStats(BaseModel):
     total_games: int = 0
@@ -168,32 +161,16 @@ async def create_game(request: NewGameRequest):
         player_x_name=request.player_name
     )
     
-    # Debug: Check if _boards is properly initialized
-    print(f"Created new game with {len(new_game._boards)} boards")
-    
     games[game_id] = new_game
     stats.total_games += 1
     stats.ongoing_games += 1
     
-    result = new_game.model_dump() if hasattr(new_game, "model_dump") else new_game.dict()
-    
-    # Ensure boards is properly formatted in the response
-    if "boards" not in result or not isinstance(result["boards"], list) or len(result["boards"]) == 0:
-        print(f"ERROR: boards is missing, not a list, or empty in new game: {result}")
-        result["boards"] = [["" for _ in range(9)] for _ in range(9)]
-    
-    return result
+    return new_game
 
 @app.get("/games/public")
 async def get_public_games():
-    public_games = []
-    for game in games.values():
-        if game.is_public and not game.game_over and game.player_o is None:
-            # Convert each game to a dict with proper boards format
-            if hasattr(game, "model_dump"):
-                public_games.append(game.model_dump())
-            else:
-                public_games.append(game.dict())
+    public_games = [game for game in games.values() 
+                   if game.is_public and not game.game_over and game.player_o is None]
     return public_games
 
 @app.get("/")
@@ -204,41 +181,35 @@ def read_root():
 async def get_game(game_id: str):
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
-    game = games[game_id]
-    
-    # Debug: Print what we're returning
-    result = game.model_dump() if hasattr(game, "model_dump") else game.dict()
-    print(f"GET /games/{game_id} response: {result}")
-    
-    # Check if boards is properly formatted
-    if "boards" not in result or not isinstance(result["boards"], list) or len(result["boards"]) == 0:
-        print(f"ERROR: boards is missing, not a list, or empty: {result}")
-        # Ensure boards exists and is a list of lists
-        result["boards"] = [["" for _ in range(9)] for _ in range(9)]
-    
-    return result
+    return games[game_id]
 
 @app.post("/games/{game_id}/join")
 async def join_game(game_id: str, request: JoinGameRequest):
+    print(f"Attempting to join game {game_id} with player {request.player_id}, {request.player_name}")
+    
     if game_id not in games:
+        print(f"Game {game_id} not found")
         raise HTTPException(status_code=404, detail="Game not found")
     
     game = games[game_id]
     
     if game.game_over:
+        print(f"Game {game_id} is already over")
         raise HTTPException(status_code=400, detail="Game is already over")
     
     if game.player_o:
+        print(f"Game {game_id} is full, player_o: {game.player_o}")
         raise HTTPException(status_code=400, detail="Game is full")
     
     if game.player_x == request.player_id:
+        print(f"Player {request.player_id} trying to play against themselves")
         raise HTTPException(status_code=400, detail="You can't play against yourself")
     
+    print(f"Joining game {game_id} as player O: {request.player_id}, {request.player_name}")
     game.player_o = request.player_id
     game.player_o_name = request.player_name
-    if hasattr(game, "model_dump"):
-        return game.model_dump()
-    return game.dict()
+    
+    return game
 
 @app.post("/games/{game_id}/move/{board_index}/{position}")
 async def make_move(game_id: str, board_index: int, position: int, player_id: str):
@@ -325,10 +296,7 @@ async def make_move(game_id: str, board_index: int, position: int, player_id: st
         # Switch player
         game.current_player = "O" if game.current_player == "X" else "X"
     
-    # At the end, explicitly use our serialization method
-    if hasattr(game, "model_dump"):
-        return game.model_dump()
-    return game.dict()
+    return game
 
 @app.get("/stats")
 async def get_stats():
