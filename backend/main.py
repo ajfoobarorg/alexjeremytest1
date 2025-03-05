@@ -1,10 +1,12 @@
+from enum import Enum
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
 import sys
+
 app = FastAPI()
 
 # Enable CORS
@@ -16,10 +18,61 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class Square(str, Enum):
+    """Represents a single square on a tic-tac-toe board."""
+    EMPTY = ""
+    X = "X"
+    O = "O"
+
+class Board:
+    """Internal representation of a tic-tac-toe board."""
+    def __init__(self):
+        self._squares = ["" for _ in range(9)]
+    
+    def get(self, pos: int) -> str:
+        """Get the value of a square at position 0-8."""
+        if not 0 <= pos <= 8:
+            raise ValueError("Position must be between 0 and 8")
+        return self._squares[pos]
+    
+    def set(self, pos: int, value: str) -> None:
+        """Set a square to a value."""
+        if not 0 <= pos <= 8:
+            raise ValueError("Position must be between 0 and 8")
+        if value not in ["", "X", "O"]:
+            raise ValueError("Value must be '', 'X', or 'O'")
+        self._squares[pos] = value
+    
+    def to_list(self) -> List[str]:
+        """Convert board to list of strings for API responses."""
+        result = self._squares.copy()
+        # Ensure all elements are strings
+        for i in range(len(result)):
+            if result[i] is None:
+                result[i] = ""
+        return result
+    
+    def is_full(self) -> bool:
+        """Check if board has no empty squares."""
+        return "" not in self._squares
+    
+    def check_winner(self) -> Optional[str]:
+        """Check if this board has a winner."""
+        lines = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
+            [0, 4, 8], [2, 4, 6]  # Diagonals
+        ]
+        
+        for line in lines:
+            if (self._squares[line[0]] and 
+                self._squares[line[0]] == self._squares[line[1]] == self._squares[line[2]]):
+                return self._squares[line[0]]
+        return None
+
 class GameState(BaseModel):
     id: str
     name: str
-    boards: List[List[str]]  # 9 separate boards, each with 9 positions
     meta_board: List[str]    # The big board showing which small boards are won
     current_player: str
     next_board: Optional[int] = None  # Which board (0-8) must be played in next, None if player can choose
@@ -31,6 +84,47 @@ class GameState(BaseModel):
     player_o: Optional[str] = None  # Player ID for O
     player_x_name: Optional[str] = None  # Player name for X
     player_o_name: Optional[str] = None  # Player name for O
+    
+    class Config:
+        arbitrary_types_allowed = True
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Always initialize boards
+        self._boards = [Board() for _ in range(9)]
+    
+    def dict(self, *args, **kwargs) -> Dict[str, Any]:
+        """Override dict method to include boards in API response."""
+        result = super().dict(*args, **kwargs)
+        # Convert _boards to list of lists for API
+        boards_list = []
+        for board in self._boards:
+            board_list = board.to_list()
+            # Ensure it's a list of strings
+            if not isinstance(board_list, list):
+                board_list = ["" for _ in range(9)]
+            boards_list.append(board_list)
+        result["boards"] = boards_list
+        # Remove private field from response
+        if "_boards" in result:
+            del result["_boards"]
+        return result
+    
+    def get_board(self, index: int) -> Board:
+        """Get a board object by index."""
+        if not 0 <= index <= 8:
+            raise ValueError("Board index must be between 0 and 8")
+        return self._boards[index]
+
+    def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
+        """Override model_dump method for newer Pydantic versions."""
+        result = super().model_dump(*args, **kwargs) if hasattr(super(), "model_dump") else super().dict(*args, **kwargs)
+        # Convert _boards to list of lists for API
+        result["boards"] = [board.to_list() for board in self._boards]
+        # Remove private field from response
+        if "_boards" in result:
+            del result["_boards"]
+        return result
 
 class GameStats(BaseModel):
     total_games: int = 0
@@ -54,49 +148,52 @@ class JoinGameRequest(BaseModel):
 games: Dict[str, GameState] = {}
 stats = GameStats()
 
-def check_winner(board: List[str]) -> Optional[str]:
-    # Winning combinations
-    lines = [
-        [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
-        [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
-        [0, 4, 8], [2, 4, 6]  # Diagonals
-    ]
-    
-    for line in lines:
-        if board[line[0]] and board[line[0]] == board[line[1]] == board[line[2]]:
-            return board[line[0]]
-    return None
-
-def is_board_full(board: List[str]) -> bool:
-    return "" not in board
-
-def is_board_playable(meta_board: List[str], board_index: int) -> bool:
-    return meta_board[board_index] == "" and not is_board_full(board_index)
+def is_board_playable(meta_board: List[str], board_index: int, board: Board) -> bool:
+    """Check if a board can be played in."""
+    return meta_board[board_index] == "" and not board.is_full()
 
 @app.post("/games/new")
 async def create_game(request: NewGameRequest):
     game_id = str(uuid.uuid4())
+    
     new_game = GameState(
         id=game_id,
         name=request.game_name,
-        boards=[["" for _ in range(9)] for _ in range(9)],  # 9 empty boards
-        meta_board=["" for _ in range(9)],  # Empty big board
+        meta_board=["" for _ in range(9)],
         current_player="X",
-        next_board=None,  # First player can play in any board
+        next_board=None,
         created_at=datetime.now(),
         is_public=request.is_public,
         player_x=request.player_id,
         player_x_name=request.player_name
     )
+    
+    # Debug: Check if _boards is properly initialized
+    print(f"Created new game with {len(new_game._boards)} boards")
+    
     games[game_id] = new_game
     stats.total_games += 1
     stats.ongoing_games += 1
-    return new_game
+    
+    result = new_game.model_dump() if hasattr(new_game, "model_dump") else new_game.dict()
+    
+    # Ensure boards is properly formatted in the response
+    if "boards" not in result or not isinstance(result["boards"], list) or len(result["boards"]) == 0:
+        print(f"ERROR: boards is missing, not a list, or empty in new game: {result}")
+        result["boards"] = [["" for _ in range(9)] for _ in range(9)]
+    
+    return result
 
 @app.get("/games/public")
 async def get_public_games():
-    public_games = [game for game in games.values() 
-                   if game.is_public and not game.game_over and game.player_o is None]
+    public_games = []
+    for game in games.values():
+        if game.is_public and not game.game_over and game.player_o is None:
+            # Convert each game to a dict with proper boards format
+            if hasattr(game, "model_dump"):
+                public_games.append(game.model_dump())
+            else:
+                public_games.append(game.dict())
     return public_games
 
 @app.get("/")
@@ -107,7 +204,19 @@ def read_root():
 async def get_game(game_id: str):
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
-    return games[game_id]
+    game = games[game_id]
+    
+    # Debug: Print what we're returning
+    result = game.model_dump() if hasattr(game, "model_dump") else game.dict()
+    print(f"GET /games/{game_id} response: {result}")
+    
+    # Check if boards is properly formatted
+    if "boards" not in result or not isinstance(result["boards"], list) or len(result["boards"]) == 0:
+        print(f"ERROR: boards is missing, not a list, or empty: {result}")
+        # Ensure boards exists and is a list of lists
+        result["boards"] = [["" for _ in range(9)] for _ in range(9)]
+    
+    return result
 
 @app.post("/games/{game_id}/join")
 async def join_game(game_id: str, request: JoinGameRequest):
@@ -127,7 +236,9 @@ async def join_game(game_id: str, request: JoinGameRequest):
     
     game.player_o = request.player_id
     game.player_o_name = request.player_name
-    return game
+    if hasattr(game, "model_dump"):
+        return game.model_dump()
+    return game.dict()
 
 @app.post("/games/{game_id}/move/{board_index}/{position}")
 async def make_move(game_id: str, board_index: int, position: int, player_id: str):
@@ -151,26 +262,42 @@ async def make_move(game_id: str, board_index: int, position: int, player_id: st
     if game.next_board is not None and game.next_board != board_index:
         raise HTTPException(status_code=400, detail="Must play in the indicated board")
     
+    # Get the board object
+    board = game.get_board(board_index)
+    
     # Verify the chosen board is playable
-    if game.meta_board[board_index] != "" or is_board_full(game.boards[board_index]):
+    if not is_board_playable(game.meta_board, board_index, board):
         raise HTTPException(status_code=400, detail="This board is already completed")
     
     # Verify the position is empty
-    if game.boards[board_index][position]:
+    if board.get(position):
         raise HTTPException(status_code=400, detail="Position already taken")
     
     # Make the move
-    game.boards[board_index][position] = game.current_player
+    board.set(position, game.current_player)
     
     # Check if the small board was won
-    small_winner = check_winner(game.boards[board_index])
+    small_winner = board.check_winner()
     if small_winner:
         game.meta_board[board_index] = small_winner
-    elif is_board_full(game.boards[board_index]):
+    elif board.is_full():
         game.meta_board[board_index] = "T"  # T for Tie
     
     # Check if the game was won
-    winner = check_winner(game.meta_board)
+    winner = None
+    # We still use the original check_winner logic for meta_board
+    lines = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
+        [0, 4, 8], [2, 4, 6]  # Diagonals
+    ]
+    
+    for line in lines:
+        if (game.meta_board[line[0]] and game.meta_board[line[0]] != "T" and
+            game.meta_board[line[0]] == game.meta_board[line[1]] == game.meta_board[line[2]]):
+            winner = game.meta_board[line[0]]
+            break
+    
     if winner:
         game.winner = winner
         game.game_over = True
@@ -189,7 +316,8 @@ async def make_move(game_id: str, board_index: int, position: int, player_id: st
     else:
         # Set next board based on the position played
         # If the target board is completed, player can choose any incomplete board
-        if game.meta_board[position] != "" or is_board_full(game.boards[position]):
+        next_board = game.get_board(position)
+        if game.meta_board[position] != "" or next_board.is_full():
             game.next_board = None
         else:
             game.next_board = position
@@ -197,7 +325,10 @@ async def make_move(game_id: str, board_index: int, position: int, player_id: st
         # Switch player
         game.current_player = "O" if game.current_player == "X" else "X"
     
-    return game
+    # At the end, explicitly use our serialization method
+    if hasattr(game, "model_dump"):
+        return game.model_dump()
+    return game.dict()
 
 @app.get("/stats")
 async def get_stats():
