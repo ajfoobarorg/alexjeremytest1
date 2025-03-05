@@ -4,6 +4,7 @@
   import { navigate } from './router.js';
   import PlayerNameModal from './PlayerNameModal.svelte';
   import GameEndModal from './GameEndModal.svelte';
+  import { API_BASE_URL } from './config.js';
 
   export let gameId;
 
@@ -43,7 +44,7 @@
     if (!$playerName) return false;
     
     try {
-      const response = await fetch(`http://localhost:8000/games/${gameId}/join`, {
+      const response = await fetch(`${API_BASE_URL}/games/${gameId}/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,7 +66,7 @@
 
   async function fetchGameState() {
     try {
-      const response = await fetch(`http://localhost:8000/games/${gameId}`);
+      const response = await fetch(`${API_BASE_URL}/games/${gameId}`);
       const data = await response.json();
       boards = data.boards;
       metaBoard = data.meta_board;
@@ -110,7 +111,7 @@
     if (metaBoard[boardIndex] !== "") return;
     
     try {
-      const response = await fetch(`http://localhost:8000/games/${gameId}/move/${boardIndex}/${position}?player_id=${$playerId}`, {
+      const response = await fetch(`${API_BASE_URL}/games/${gameId}/move/${boardIndex}/${position}?player_id=${$playerId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

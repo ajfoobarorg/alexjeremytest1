@@ -3,6 +3,7 @@
   import { navigate } from './router.js';
   import { playerId, playerName, playerStats } from './stores.js';
   import PlayerNameModal from './PlayerNameModal.svelte';
+  import { API_BASE_URL } from './config.js';
 
   let publicGames = [];
   let stats = { total_games: 0, completed_games: 0, ongoing_games: 0, x_wins: 0, o_wins: 0 };
@@ -12,7 +13,7 @@
 
   async function fetchPublicGames() {
     try {
-      const response = await fetch('http://localhost:8000/games/public');
+      const response = await fetch(`${API_BASE_URL}/games/public`);
       publicGames = await response.json();
     } catch (error) {
       console.error('Error fetching public games:', error);
@@ -21,7 +22,7 @@
 
   async function fetchStats() {
     try {
-      const response = await fetch('http://localhost:8000/stats');
+      const response = await fetch(`${API_BASE_URL}/stats`);
       stats = await response.json();
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -36,7 +37,7 @@
     }
 
     try {
-      const response = await fetch('http://localhost:8000/games/new', {
+      const response = await fetch(`${API_BASE_URL}/games/new`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +60,7 @@
     if (!$playerName) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/games/${gameId}/join`, {
+      const response = await fetch(`${API_BASE_URL}/games/${gameId}/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

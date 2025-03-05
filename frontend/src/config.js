@@ -6,3 +6,4 @@ export const API_BASE_URL = isDevelopment ? 'http://localhost:8000' : import.met
 
 console.log('Environment:', isDevelopment ? 'development' : 'production');
 console.log('API_BASE_URL:', API_BASE_URL);
+
