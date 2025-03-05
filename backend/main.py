@@ -185,27 +185,20 @@ async def get_game(game_id: str):
 
 @app.post("/games/{game_id}/join")
 async def join_game(game_id: str, request: JoinGameRequest):
-    print(f"Attempting to join game {game_id} with player {request.player_id}, {request.player_name}")
-    
     if game_id not in games:
-        print(f"Game {game_id} not found")
         raise HTTPException(status_code=404, detail="Game not found")
     
     game = games[game_id]
     
     if game.game_over:
-        print(f"Game {game_id} is already over")
         raise HTTPException(status_code=400, detail="Game is already over")
     
     if game.player_o:
-        print(f"Game {game_id} is full, player_o: {game.player_o}")
         raise HTTPException(status_code=400, detail="Game is full")
     
     if game.player_x == request.player_id:
-        print(f"Player {request.player_id} trying to play against themselves")
         raise HTTPException(status_code=400, detail="You can't play against yourself")
     
-    print(f"Joining game {game_id} as player O: {request.player_id}, {request.player_name}")
     game.player_o = request.player_id
     game.player_o_name = request.player_name
     
