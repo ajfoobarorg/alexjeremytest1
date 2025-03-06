@@ -2,16 +2,27 @@
 from typing import List
 import os
 import logging
+import socket
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class Config:
-    # Production mode
-    PRODUCTION: bool = os.environ.get("PRODUCTION", "false").lower() == "true"
+    # Better production detection:
+    # 1. Check explicit PRODUCTION env var
+    # 2. Check if we're running on Render (they set this env var)
+    # 3. Check hostname (not localhost)
+    EXPLICIT_PRODUCTION = os.environ.get("PRODUCTION", "false").lower() == "true"
+    RENDER_SERVICE = os.environ.get("RENDER", "false").lower() == "true"
+    HOSTNAME = socket.gethostname()
+    IS_LOCALHOST = HOSTNAME == "localhost" or HOSTNAME.startswith("127.0.0")
     
-    # Log production status
+    # Production if explicitly set, running on Render, or not on localhost
+    PRODUCTION = EXPLICIT_PRODUCTION or RENDER_SERVICE or not IS_LOCALHOST
+    
+    # Log production status with details
+    logger.info(f"Production detection: EXPLICIT={EXPLICIT_PRODUCTION}, RENDER={RENDER_SERVICE}, HOSTNAME={HOSTNAME}")
     logger.info(f"Running in {'PRODUCTION' if PRODUCTION else 'DEVELOPMENT'} mode")
 
     # Frontend URL - in development use localhost, in production get from env
