@@ -7,8 +7,16 @@ import uuid
 from datetime import datetime
 from config import config
 import sys
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+# Log CORS configuration
+logger.info(f"Setting up CORS with allow_origins: {config.ALLOWED_ORIGINS}")
 
 # Enable CORS
 app.add_middleware(
