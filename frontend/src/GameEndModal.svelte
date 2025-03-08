@@ -1,8 +1,8 @@
 # This is a new file
 <script>
   import { onMount } from 'svelte';
-  import { playerStats } from './stores.js';
   import { createEventDispatcher } from 'svelte';
+  import { calculateTotalGames, calculateWinRate } from './utils.js';
   
   const dispatch = createEventDispatcher();
   
@@ -94,12 +94,12 @@
         </div>
         <div class="stat">
           <span class="label">Win Rate</span>
-          <span class="value">{((stats.wins / stats.totalGames) * 100).toFixed(1)}%</span>
+          <span class="value">{calculateWinRate(stats)}%</span>
         </div>
       </div>
     </div>
 
-    <button class="dismiss-button" on:click={() => dispatch('close')}>
+    <button class="dismiss-button" on:click={() => dispatch('dismiss')}>
       Close
     </button>
   </div>

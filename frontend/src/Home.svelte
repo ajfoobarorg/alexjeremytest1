@@ -1,15 +1,22 @@
 <script>
   import { onMount } from 'svelte';
   import { navigate } from './router.js';
-  import { playerId, playerName, playerStats } from './stores.js';
+  import { playerId } from './stores.js';
   import PlayerNameModal from './PlayerNameModal.svelte';
   import { API_BASE_URL } from './config.js';
+  import { calculateTotalGames, calculateWinRate } from './utils.js';
 
+  // Game data
   let publicGames = [];
-  let stats = { total_games: 0, completed_games: 0, ongoing_games: 0, x_wins: 0, o_wins: 0 };
   let isPublic = true;
   let gameName = '';
+  
+  // Player data
+  let player = null;
+  
+  // UI state
   let error = '';
+  let isLoading = true;
 
   async function fetchPublicGames() {
     try {
@@ -20,17 +27,21 @@
     }
   }
 
-  async function fetchStats() {
+  async function fetchPlayerData() {
     try {
-      const response = await fetch(`${API_BASE_URL}/stats`);
-      stats = await response.json();
+      const response = await fetch(`${API_BASE_URL}/players/${$playerId}`);
+      if (response.ok) {
+        player = await response.json();
+      }
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error('Error fetching player data:', error);
+    } finally {
+      isLoading = false;
     }
   }
 
   async function createNewGame() {
-    if (!$playerName) return;
+    if (!player?.name) return;
     if (!gameName.trim()) {
       error = 'Please enter a game name';
       return;
@@ -45,7 +56,7 @@
         body: JSON.stringify({
           is_public: isPublic,
           player_id: $playerId,
-          player_name: $playerName,
+          player_name: player.name,
           game_name: gameName.trim()
         }),
       });
@@ -56,106 +67,47 @@
     }
   }
 
-  async function joinGame(gameId) {
-    if (!$playerName) return;
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/games/${gameId}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          player_id: $playerId,
-          player_name: $playerName
-        })
-      });
-      const game = await response.json();
-      navigate(`/game/${game.id}`);
-    } catch (error) {
-      console.error('Error joining game:', error);
-    }
-  }
-
-  // Poll for updates
-  let interval;
-  onMount(() => {
-    fetchPublicGames();
-    fetchStats();
-    interval = setInterval(() => {
-      fetchPublicGames();
-      fetchStats();
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
-    };
+  onMount(async () => {
+    await fetchPlayerData();
+    await fetchPublicGames();
+    
+    // Refresh public games list periodically
+    const interval = setInterval(fetchPublicGames, 5000);
+    return () => clearInterval(interval);
   });
 </script>
 
-{#if !$playerName}
+{#if isLoading}
+  <div class="loading">Loading...</div>
+{:else if !player?.name}
   <PlayerNameModal />
 {:else}
 <main>
-  <h1>Tic Tac Toe Games</h1>
-
-  <div class="welcome">
-    <p>Welcome, {$playerName}!</p>
-  </div>
-
+  <h1>Ultimate Tic-Tac-Toe</h1>
+  
   <div class="stats-container">
-    <div class="stats">
-      <h2>Global Scores</h2>
-      <div class="stat-grid">
-        <div class="stat-item">
-          <span class="label">Total Games</span>
-          <span class="value">{stats.total_games}</span>
-        </div>
-        <div class="stat-item">
-          <span class="label">Ongoing Games</span>
-          <span class="value">{stats.ongoing_games}</span>
-        </div>
-        <div class="stat-item">
-          <span class="label">X Wins</span>
-          <span class="value">{stats.x_wins}</span>
-        </div>
-        <div class="stat-item">
-          <span class="label">O Wins</span>
-          <span class="value">{stats.o_wins}</span>
-        </div>
-        <div class="stat-item">
-          <span class="label">Draws</span>
-          <span class="value">{stats.draws}</span>
-        </div>
-        <div class="stat-item">
-          <span class="label">Completed</span>
-          <span class="value">{stats.completed_games}</span>
-        </div>
-      </div>
-    </div>
-
     <div class="stats personal">
-      <h2>Your Scores</h2>
+      <h2>Your Stats</h2>
       <div class="stat-grid">
         <div class="stat-item">
           <span class="label">Total Games</span>
-          <span class="value">{$playerStats.totalGames}</span>
+          <span class="value">{calculateTotalGames(player)}</span>
         </div>
         <div class="stat-item">
           <span class="label">Wins</span>
-          <span class="value">{$playerStats.wins}</span>
+          <span class="value">{player.wins}</span>
         </div>
         <div class="stat-item">
           <span class="label">Losses</span>
-          <span class="value">{$playerStats.losses}</span>
+          <span class="value">{player.losses}</span>
         </div>
         <div class="stat-item">
           <span class="label">Draws</span>
-          <span class="value">{$playerStats.draws}</span>
+          <span class="value">{player.draws}</span>
         </div>
         <div class="stat-item">
           <span class="label">Win Rate</span>
-          <span class="value">{(($playerStats.wins / ($playerStats.totalGames || 1)) * 100).toFixed(1)}%</span>
+          <span class="value">{calculateWinRate(player)}%</span>
         </div>
         <div class="stat-item highlight">
           <span class="label">Best Streak</span>
@@ -186,24 +138,22 @@
     <button on:click={createNewGame}>Create New Game</button>
   </div>
 
-  <div class="public-games">
-    <h2>Available Public Games</h2>
-    {#if publicGames.length === 0}
-      <p>No public games available</p>
-    {:else}
-      <ul>
+  {#if publicGames.length > 0}
+    <div class="public-games">
+      <h2>Join a Public Game</h2>
+      <div class="games-list">
         {#each publicGames as game}
-          <li>
-            <div class="game-info">
-              <span class="game-name">{game.name}</span>
-              <span class="player-name">Created by: {game.player_x_name}</span>
-            </div>
-            <button on:click={() => joinGame(game.id)}>Join Game</button>
-          </li>
+          <div class="game-item">
+            <span class="game-name">{game.name}</span>
+            <span class="player-name">Created by: {game.player_x.name}</span>
+            <button on:click={() => navigate(`/game/${game.id}`)}>
+              Join Game
+            </button>
+          </div>
         {/each}
-      </ul>
-    {/if}
-  </div>
+      </div>
+    </div>
+  {/if}
 </main>
 {/if}
 
@@ -226,16 +176,9 @@
     margin-top: 2rem;
   }
 
-  .welcome {
-    text-align: center;
-    font-size: 1.2rem;
-    margin-bottom: 2rem;
-  }
-
   .stats-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
+    display: flex;
+    justify-content: center;
     width: 100%;
     margin-bottom: 2rem;
   }
@@ -245,6 +188,8 @@
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 600px;
   }
 
   .stats.personal {
@@ -328,23 +273,18 @@
     border-radius: 8px;
   }
 
-  ul {
-    list-style: none;
-    padding: 0;
+  .games-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
   }
 
-  li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    margin: 0.5rem 0;
+  .game-item {
     background: white;
-    border-radius: 4px;
+    padding: 1rem;
+    border-radius: 6px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-
-  .game-info {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -373,5 +313,14 @@
 
   button:hover {
     background-color: #45a049;
+  }
+
+  .loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-size: 1.2rem;
+    color: #666;
   }
 </style> 

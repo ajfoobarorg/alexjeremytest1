@@ -10,7 +10,19 @@ class BaseModel(Model):
     class Meta:
         database = db
 
+class Player(BaseModel):
+    """Player model representing a user of the game."""
+    id = CharField(primary_key=True)
+    name = CharField()
+    created_at = DateTimeField(default=datetime.datetime.now)
+    
+    # Player statistics
+    wins = IntegerField(default=0)
+    losses = IntegerField(default=0)
+    draws = IntegerField(default=0)
+
 class Game(BaseModel):
+    """Game model representing a single game of Ultimate Tic-Tac-Toe."""
     id = CharField(primary_key=True)
     name = CharField()
     current_player = CharField(default="X")
@@ -19,17 +31,21 @@ class Game(BaseModel):
     game_over = BooleanField(default=False)
     created_at = DateTimeField(default=datetime.datetime.now)
     is_public = BooleanField(default=False)
-    player_x = CharField(null=True)
-    player_o = CharField(null=True)
+    game_started = BooleanField(default=False)
+    
+    # Player references with foreign keys
+    player_x = ForeignKeyField(Player, backref='games_as_x', null=True)
+    player_o = ForeignKeyField(Player, backref='games_as_o', null=True)
+    
+    # We keep player names in the Game model for convenience
     player_x_name = CharField(null=True)
     player_o_name = CharField(null=True)
-    game_started = BooleanField(default=False)
     
     # Timing fields
     last_move_time = DateTimeField(default=datetime.datetime.now)
     player_x_time_used = IntegerField(default=0)  # Time used in seconds
     player_o_time_used = IntegerField(default=0)  # Time used in seconds
-    TOTAL_TIME_ALLOWED = 180  # 3 minutes in seconds
+    TOTAL_TIME_ALLOWED = 360  # 6 minutes in seconds
     
     # JSON fields
     meta_board = TextField(default=json.dumps(["" for _ in range(9)]))
@@ -59,6 +75,7 @@ class Game(BaseModel):
         self.last_move_time = now
         return self.get_time_remaining(self.current_player)
     
+    # Since we have special logic here for the boards, we must override the default to_dict method
     def to_dict(self):
         """Convert model to dictionary for API response."""
         return {
@@ -70,44 +87,22 @@ class Game(BaseModel):
             'next_board': self.next_board,
             'winner': self.winner,
             'game_over': self.game_over,
-            'created_at': self.created_at.isoformat(),
             'is_public': self.is_public,
-            'player_x': self.player_x,
-            'player_o': self.player_o,
-            'player_x_name': self.player_x_name,
-            'player_o_name': self.player_o_name,
-            'last_move_time': self.last_move_time.isoformat(),
-            'player_x_time_remaining': self.get_time_remaining('X'),
-            'player_o_time_remaining': self.get_time_remaining('O'),
+            'player_x': {
+                'id': self.player_x.id if self.player_x else None,
+                'name': self.player_x_name,
+                'time_remaining': self.get_time_remaining('X')
+            },
+            'player_o': {
+                'id': self.player_o.id if self.player_o else None,
+                'name': self.player_o_name,
+                'time_remaining': self.get_time_remaining('O')
+            },
             'game_started': self.game_started
         }
 
-class GameStats(BaseModel):
-    id = AutoField()
-    total_games = IntegerField(default=0)
-    completed_games = IntegerField(default=0)
-    x_wins = IntegerField(default=0)
-    o_wins = IntegerField(default=0)
-    draws = IntegerField(default=0)
-    ongoing_games = IntegerField(default=0)
-    
-    def to_dict(self):
-        return {
-            'total_games': self.total_games,
-            'completed_games': self.completed_games,
-            'x_wins': self.x_wins,
-            'o_wins': self.o_wins,
-            'draws': self.draws,
-            'ongoing_games': self.ongoing_games
-        }
-
 def initialize_db():
-    """Create tables and initialize stats if needed."""
+    """Create tables if they don't exist."""
     db.connect()
-    db.create_tables([Game, GameStats])
-    
-    # Create default stats record if it doesn't exist
-    if GameStats.select().count() == 0:
-        GameStats.create()
-    
+    db.create_tables([Player, Game])
     db.close() 
