@@ -40,6 +40,11 @@
   let pollInterval;
   let timeUpdateInterval;
 
+  // Track if we're currently handling a game end
+  let handlingGameEnd = false;
+  // Store the ELO change to display in the modal
+  let eloChange = null;
+
   // Computed values from game state
   $: gameUrl = game ? window.location.origin + `/game/${game.id}` : window.location.href;
   $: playerX = game?.player_x?.id;
@@ -69,12 +74,25 @@
     hasTriedToJoin = false;
   }
 
-  $: if (game?.game_over && !showGameEndModal && !gameEndModalDismissed) {
-    if (isPlayer) {
+  // Function to handle game end
+  async function handleGameEnd() {
+    if (handlingGameEnd) return;
+    handlingGameEnd = true;
+    
+    try {
+      // Store the ELO change before fetching updated player data
+      eloChange = playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change;
+      
+      // Fetch latest player data to ensure we have the updated ELO rating
+      await fetchPlayerData();
       showGameEndModal = true;
-      // Refresh player data to show updated stats in modal
-      fetchPlayerData();
+    } finally {
+      handlingGameEnd = false;
     }
+  }
+
+  $: if (game?.game_over && !showGameEndModal && !gameEndModalDismissed && isPlayer && !handlingGameEnd) {
+    handleGameEnd();
   }
 
   function updateDisplayTimes() {
@@ -222,14 +240,12 @@
       // Update server times
       updateTimesFromServer(data.player_x.time_remaining, data.player_o.time_remaining);
 
-      if (data.game_over) {
-        // Only show the modal if it hasn't been dismissed yet
-        if (!gameEndModalDismissed) {
-          showGameEndModal = true;
-        }
+      if (data.game_over && isPlayer && !gameEndModalDismissed) {
+        // Game just ended and we're a player - handle game end
         clearInterval(pollInterval);
         clearInterval(timeUpdateInterval);
         clearInterval(warningInterval);
+        await handleGameEnd();
       }
     } catch (error) {
       console.error('Error making move:', error);
@@ -312,14 +328,12 @@
         const data = await response.json();
         game = data; // Update game state directly
         
-        if (data.game_over) {
-          // Only show the modal if it hasn't been dismissed yet
-          if (!gameEndModalDismissed) {
-            showGameEndModal = true;
-          }
+        if (data.game_over && isPlayer && !gameEndModalDismissed) {
+          // Game just ended and we're a player - handle game end
           clearInterval(pollInterval);
           clearInterval(timeUpdateInterval);
           clearInterval(warningInterval);
+          await handleGameEnd();
         }
       }
     } catch (error) {
@@ -358,6 +372,7 @@
   function dismissGameEndModal() {
     showGameEndModal = false;
     gameEndModalDismissed = true;
+    eloChange = null; // Reset the stored ELO change
   }
 
   // Add this function to update polling frequency
@@ -535,7 +550,7 @@
       isDraw={game.game_over && !game.winner}
       playerName={player.name}
       stats={player}
-      eloChange={playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change}
+      eloChange={eloChange !== null ? eloChange : (playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change)}
       on:dismiss={dismissGameEndModal}
     />
   {/if}

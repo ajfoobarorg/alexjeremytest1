@@ -30,24 +30,24 @@
 
 <div class="modal-backdrop">
   <div class="modal">
+    <h2 class="match-title">Match Starting</h2>
+    
     <div class="players">
       <div class="player x">
-        <h2>{playerXName}</h2>
-        <div class="stats">
-          <div>Wins: {playerXStats?.wins || 0}</div>
-          <div>Losses: {playerXStats?.losses || 0}</div>
-          <div>Draws: {playerXStats?.draws || 0}</div>
+        <div class="player-name">{playerXName}</div>
+        <div class="elo-rating">
+          <span class="elo-value">{playerXStats?.elo || 800}</span>
+          <span class="elo-label">ELO</span>
         </div>
       </div>
       
       <div class="vs">VS</div>
       
       <div class="player o">
-        <h2>{playerOName}</h2>
-        <div class="stats">
-          <div>Wins: {playerOStats?.wins || 0}</div>
-          <div>Losses: {playerOStats?.losses || 0}</div>
-          <div>Draws: {playerOStats?.draws || 0}</div>
+        <div class="player-name">{playerOName}</div>
+        <div class="elo-rating">
+          <span class="elo-value">{playerOStats?.elo || 800}</span>
+          <span class="elo-label">ELO</span>
         </div>
       </div>
     </div>
@@ -84,6 +84,12 @@
     box-sizing: border-box;
   }
 
+  .match-title {
+    margin: 0 0 1.5rem 0;
+    color: #424242;
+    font-size: 1.8rem;
+  }
+
   .players {
     display: flex;
     justify-content: space-between;
@@ -95,14 +101,54 @@
   .player {
     flex: 1;
     padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 
-  .player.x h2 {
+  .player-name {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+
+  .player.x .player-name {
     color: #4CAF50;
   }
 
-  .player.o h2 {
+  .player.o .player-name {
     color: #2196F3;
+  }
+
+  .elo-rating {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #f5f5f5;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    min-width: 100px;
+  }
+
+  .player.x .elo-rating {
+    border: 2px solid #4CAF50;
+  }
+
+  .player.o .elo-rating {
+    border: 2px solid #2196F3;
+  }
+
+  .elo-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #424242;
+  }
+
+  .elo-label {
+    font-size: 0.9rem;
+    color: #757575;
+    text-transform: uppercase;
+    letter-spacing: 1px;
   }
 
   .vs {
@@ -110,12 +156,6 @@
     font-weight: bold;
     margin: 0 2rem;
     color: #424242;
-  }
-
-  .stats {
-    margin-top: 1rem;
-    font-size: 1.1rem;
-    color: #616161;
   }
 
   .countdown {
@@ -150,6 +190,11 @@
       width: 95%;
     }
 
+    .match-title {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
     .players {
       flex-direction: column;
       gap: 1rem;
@@ -161,19 +206,17 @@
       padding: 0.5rem;
     }
 
+    .player-name {
+      font-size: 1.3rem;
+    }
+
+    .elo-value {
+      font-size: 1.8rem;
+    }
+
     .vs {
       margin: 0.5rem 0;
       font-size: 1.5rem;
-    }
-
-    h2 {
-      font-size: 1.3rem;
-      margin: 0.5rem 0;
-    }
-
-    .stats {
-      margin-top: 0.5rem;
-      font-size: 1rem;
     }
 
     .countdown {
@@ -187,8 +230,16 @@
       padding: 1rem;
     }
 
-    .stats {
-      font-size: 0.9rem;
+    .player-name {
+      font-size: 1.2rem;
+    }
+
+    .elo-value {
+      font-size: 1.5rem;
+    }
+
+    .elo-label {
+      font-size: 0.8rem;
     }
   }
 </style> 
