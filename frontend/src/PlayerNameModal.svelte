@@ -1,15 +1,37 @@
+# This is a new file
 <script>
-  import { playerName } from './stores.js';
+  import { playerId } from './stores.js';
+  import { API_BASE_URL } from './config.js';
 
   let name = '';
   let error = '';
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (name.trim().length < 2) {
       error = 'Name must be at least 2 characters long';
       return;
     }
-    $playerName = name.trim();
+
+    try {
+      // Update player name in the backend
+      const response = await fetch(`${API_BASE_URL}/players/${$playerId}/name`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: name.trim() })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save player name');
+      }
+
+      // Force a page reload to update all components with the new name
+      window.location.reload();
+    } catch (error) {
+      console.error('Error saving player name:', error);
+      error = 'Failed to save name. Please try again.';
+    }
   }
 </script>
 

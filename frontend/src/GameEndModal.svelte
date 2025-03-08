@@ -1,7 +1,11 @@
 # This is a new file
 <script>
   import { onMount } from 'svelte';
-  import { playerStats } from './stores.js';
+  import { createEventDispatcher } from 'svelte';
+  import { calculateTotalGames, calculateWinRate } from './utils.js';
+  import { navigate } from './router.js';
+  
+  const dispatch = createEventDispatcher();
   
   export let isWinner;
   export let isDraw;
@@ -9,6 +13,14 @@
   export let stats;
   
   let confetti;
+  
+  function handleClose() {
+    dispatch('dismiss');
+  }
+  
+  function goToHome() {
+    navigate('/');
+  }
   
   onMount(async () => {
     if (isWinner) {
@@ -61,8 +73,8 @@
   });
 </script>
 
-<div class="modal-backdrop">
-  <div class="modal">
+<div class="modal-backdrop" on:click={handleClose}>
+  <div class="modal" on:click|stopPropagation>
     {#if isWinner}
       <h2>🎉 Congratulations, {playerName}! 🎉</h2>
       <p class="message">You've won the game!</p>
@@ -91,9 +103,18 @@
         </div>
         <div class="stat">
           <span class="label">Win Rate</span>
-          <span class="value">{((stats.wins / stats.totalGames) * 100).toFixed(1)}%</span>
+          <span class="value">{calculateWinRate(stats)}%</span>
         </div>
       </div>
+    </div>
+
+    <div class="button-container">
+      <button class="dismiss-button" on:click={handleClose}>
+        Close
+      </button>
+      <button class="home-button" on:click={goToHome}>
+        Back to Home
+      </button>
     </div>
   </div>
 </div>
@@ -181,5 +202,41 @@
     font-size: 1.5rem;
     font-weight: bold;
     color: #2e7d32;
+  }
+
+  .button-container {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .dismiss-button, .home-button {
+    padding: 0.8rem 1.5rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    position: relative;
+    z-index: 1010;
+  }
+
+  .dismiss-button {
+    background-color: #757575;
+    color: white;
+  }
+
+  .dismiss-button:hover {
+    background-color: #616161;
+  }
+
+  .home-button {
+    background-color: #4CAF50;
+    color: white;
+  }
+
+  .home-button:hover {
+    background-color: #45a049;
   }
 </style> 
