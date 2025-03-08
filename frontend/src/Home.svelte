@@ -87,31 +87,31 @@
   
   <div class="stats-container">
     <div class="stats personal">
-      <h2>Your Stats</h2>
+      <h3>Your Statistics</h3>
       <div class="stat-grid">
-        <div class="stat-item">
+        <div class="stat elo">
+          <span class="label">ELO Rating</span>
+          <span class="value">{player.elo}</span>
+        </div>
+        <div class="stat">
           <span class="label">Total Games</span>
           <span class="value">{calculateTotalGames(player)}</span>
         </div>
-        <div class="stat-item">
+        <div class="stat">
           <span class="label">Wins</span>
           <span class="value">{player.wins}</span>
         </div>
-        <div class="stat-item">
+        <div class="stat">
           <span class="label">Losses</span>
           <span class="value">{player.losses}</span>
         </div>
-        <div class="stat-item">
+        <div class="stat">
           <span class="label">Draws</span>
           <span class="value">{player.draws}</span>
         </div>
-        <div class="stat-item">
+        <div class="stat">
           <span class="label">Win Rate</span>
           <span class="value">{calculateWinRate(player)}%</span>
-        </div>
-        <div class="stat-item highlight">
-          <span class="label">Best Streak</span>
-          <span class="value">Coming soon!</span>
         </div>
       </div>
     </div>
@@ -322,5 +322,17 @@
     height: 100vh;
     font-size: 1.2rem;
     color: #666;
+  }
+
+  .stat.elo {
+    grid-column: span 2;
+    background: #e8f5e9;
+    border: 2px solid #2e7d32;
+  }
+
+  .stat.elo .value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #2e7d32;
   }
 </style> 

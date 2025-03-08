@@ -12,6 +12,7 @@ class PlayerResponse(BaseModel):
     wins: int
     losses: int
     draws: int
+    elo: int
     
     class Config:
         orm_mode = True
@@ -37,6 +38,8 @@ class GamePlayerInfo(BaseModel):
     id: Optional[str] = None
     name: Optional[str] = None
     time_remaining: int = 360  # Default to 6 minutes in seconds
+    elo: Optional[int] = None
+    elo_change: Optional[int] = None
 
 class GameResponse(BaseModel):
     id: str

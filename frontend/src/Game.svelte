@@ -10,28 +10,8 @@
 
   export let gameId;
 
-  // Game state
-  let boards = Array(9).fill(null).map(() => Array(9).fill(""));
-  let metaBoard = Array(9).fill("");
-  let currentPlayer = "X";
-  let winner = null;
-  let gameOver = false;
-  let nextBoard = null;
-  let gameStarted = false;
-  
-  // Game metadata
-  let gameName = "";
-  let gameUrl = window.location.href;
-  
-  // Player information
-  let player = null; // Current player data including name and stats
-  let playerSymbol = null;
-  let isPlayer = false;
-  let opponent = null; // Opponent data including name and stats
-  
-  // Player references from game
-  let playerX = null;
-  let playerO = null;
+  // Game state - single source of truth
+  let game = null;
   
   // UI state
   let showCopiedMessage = false;
@@ -42,6 +22,12 @@
   let startGameModalShown = false; // Track if start game modal has been shown
   let isLoading = true;
   let showResignConfirm = false;
+  
+  // Player information
+  let player = null; // Current player data including name and stats
+  let playerSymbol = null;
+  let isPlayer = false;
+  let opponent = null; // Opponent data including name and stats
 
   // Timing variables
   let lastUpdateTime = null;
@@ -53,6 +39,14 @@
   let warningInterval;
   let pollInterval;
   let timeUpdateInterval;
+
+  // Computed values from game state
+  $: gameUrl = game ? window.location.origin + `/game/${game.id}` : window.location.href;
+  $: playerX = game?.player_x?.id;
+  $: playerO = game?.player_o?.id;
+  $: isMyTurn = game?.current_player === 'X' ? playerX === $playerId : playerO === $playerId;
+  $: timeRemaining = game?.current_player === 'X' ? displayedXTimeRemaining : displayedOTimeRemaining;
+  $: showWarning = isMyTurn && (warningCountdown !== null || (timeRemaining !== null && timeRemaining <= 25)) && !game?.game_over;
 
   async function fetchPlayerData() {
     try {
@@ -75,7 +69,7 @@
     hasTriedToJoin = false;
   }
 
-  $: if (gameOver && !showGameEndModal && !gameEndModalDismissed) {
+  $: if (game?.game_over && !showGameEndModal && !gameEndModalDismissed) {
     if (isPlayer) {
       showGameEndModal = true;
       // Refresh player data to show updated stats in modal
@@ -83,12 +77,8 @@
     }
   }
 
-  $: isMyTurn = currentPlayer === 'X' ? playerX === $playerId : playerO === $playerId;
-  $: timeRemaining = currentPlayer === 'X' ? displayedXTimeRemaining : displayedOTimeRemaining;
-  $: showWarning = isMyTurn && (warningCountdown !== null || (timeRemaining !== null && timeRemaining <= 25)) && !gameOver;
-
   function updateDisplayTimes() {
-    if (gameOver || lastUpdateTime === null) return;
+    if (game?.game_over || lastUpdateTime === null) return;
     
     const now = Date.now();
     const elapsed = Math.floor((now - lastUpdateTime) / 1000);
@@ -96,7 +86,7 @@
     // Only update if a full second has passed
     if (elapsed > 0) {
       // Only decrement time for the current player
-      if (currentPlayer === 'X') {
+      if (game.current_player === 'X') {
         displayedXTimeRemaining = Math.max(0, serverPlayerXTimeRemaining - elapsed);
         displayedOTimeRemaining = serverPlayerOTimeRemaining;
       } else {
@@ -113,7 +103,7 @@
 
   function updateTimesFromServer(xTime, oTime) {
     // Don't start timing until both players have joined and countdown is complete
-    if (!gameStarted || !playerO) return;
+    if (!game?.game_started || !playerO) return;
 
     // Initialize the timer if this is the first update
     if (lastUpdateTime === null) {
@@ -161,20 +151,11 @@
       // Store previous state to detect changes
       const hadPlayerO = playerO !== null;
       
-      // Update game state
-      boards = data.boards;
-      metaBoard = data.meta_board;
-      currentPlayer = data.current_player;
-      winner = data.winner;
-      gameOver = data.game_over;
-      gameName = data.name;
-      playerX = data.player_x.id;
-      playerO = data.player_o.id;
-      nextBoard = data.next_board;
-      gameStarted = data.game_started;
+      // Store full game data
+      game = data;
       
       // Determine if we need to fetch opponent data
-      const needToFetchOpponent = (!opponent && (playerX || playerO)) || (!hadPlayerO && playerO) || gameOver;
+      const needToFetchOpponent = (!opponent && (playerX || playerO)) || (!hadPlayerO && game.player_o.id) || game.game_over;
       
       // Fetch opponent stats when needed
       if (needToFetchOpponent) {
@@ -191,7 +172,7 @@
       }
       
       // Check if second player just joined
-      if (playerO && !gameStarted && !showStartGameModal && !startGameModalShown) {
+      if (game.player_o.id && !game.game_started && !showStartGameModal && !startGameModalShown) {
         showStartGameModal = true;
         startGameModalShown = true; // Mark that we've shown the modal
       }
@@ -208,7 +189,7 @@
       } else if (data.player_o.id === $playerId) {
         isPlayer = true;
         playerSymbol = "O";
-      } else if (!hasTriedToJoin && !data.player_o.id && !gameOver && player?.name) {
+      } else if (!hasTriedToJoin && !data.player_o.id && !data.game_over && player?.name) {
         hasTriedToJoin = true;
         const joined = await tryJoinGame();
         if (joined) {
@@ -216,17 +197,15 @@
           return;
         }
       }
-
-      gameUrl = window.location.origin + `/game/${gameId}`;
     } catch (error) {
       console.error('Error fetching game state:', error);
     }
   }
 
   async function makeMove(boardIndex, position) {
-    if (!isMyTurn || gameOver) return;
-    if (nextBoard !== null && nextBoard !== boardIndex) return;
-    if (metaBoard[boardIndex] !== "") return;
+    if (!isMyTurn || game.game_over) return;
+    if (game.next_board !== null && game.next_board !== boardIndex) return;
+    if (game.meta_board[boardIndex] !== "") return;
     
     try {
       stopWarningCountdown();  // Reset warning countdown when making a move
@@ -237,28 +216,43 @@
         }
       });
       const data = await response.json();
-      updateGameState(data);
+      game = data; // Update game state directly
       lastUpdateTime = Date.now();  // Reset the inactivity timer
+      
+      // Update server times
+      updateTimesFromServer(data.player_x.time_remaining, data.player_o.time_remaining);
+
+      if (data.game_over) {
+        // Only show the modal if it hasn't been dismissed yet
+        if (!gameEndModalDismissed) {
+          showGameEndModal = true;
+        }
+        clearInterval(pollInterval);
+        clearInterval(timeUpdateInterval);
+        clearInterval(warningInterval);
+      }
     } catch (error) {
       console.error('Error making move:', error);
     }
   }
 
   function isBoardPlayable(boardIndex) {
-    return (nextBoard === null || nextBoard === boardIndex) && 
-           metaBoard[boardIndex] === "" &&
+    if (!game) return false;
+    return (game.next_board === null || game.next_board === boardIndex) && 
+           game.meta_board[boardIndex] === "" &&
            !isBoardFull(boardIndex);
   }
 
   function isBoardFull(boardIndex) {
-    return !boards[boardIndex].includes("");
+    if (!game) return true;
+    return !game.boards[boardIndex].includes("");
   }
 
   function getBoardClass(boardIndex) {
     let classes = ['small-board'];
     if (isBoardPlayable(boardIndex)) classes.push('playable');
-    if (nextBoard === boardIndex) classes.push('active');
-    if (metaBoard[boardIndex]) classes.push('completed');
+    if (game?.next_board === boardIndex) classes.push('active');
+    if (game?.meta_board[boardIndex]) classes.push('completed');
     return classes.join(' ');
   }
 
@@ -316,7 +310,17 @@
       
       if (response.ok) {
         const data = await response.json();
-        updateGameState(data);
+        game = data; // Update game state directly
+        
+        if (data.game_over) {
+          // Only show the modal if it hasn't been dismissed yet
+          if (!gameEndModalDismissed) {
+            showGameEndModal = true;
+          }
+          clearInterval(pollInterval);
+          clearInterval(timeUpdateInterval);
+          clearInterval(warningInterval);
+        }
       }
     } catch (error) {
       console.error('Error resigning game:', error);
@@ -327,39 +331,6 @@
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  function updateGameState(data) {
-    boards = data.boards;
-    metaBoard = data.meta_board;
-    currentPlayer = data.current_player;
-    nextBoard = data.next_board;
-    winner = data.winner;
-    gameOver = data.game_over;
-    playerX = data.player_x.id;
-    playerO = data.player_o.id;
-    gameStarted = data.game_started;
-    
-    // Update server times
-    updateTimesFromServer(data.player_x.time_remaining, data.player_o.time_remaining);
-
-    if (gameOver) {
-      // Only show the modal if it hasn't been dismissed yet
-      if (!gameEndModalDismissed) {
-        showGameEndModal = true;
-      }
-      clearInterval(pollInterval);
-      clearInterval(timeUpdateInterval);
-      clearInterval(warningInterval);
-    } else {
-      // Reset the dismissed flag when a new game starts
-      gameEndModalDismissed = false;
-      
-      // Reset the start game modal flag if the game is completely reset
-      if (!data.game_started && !data.player_o.id) {
-        startGameModalShown = false;
-      }
-    }
   }
 
   async function handleGameStart() {
@@ -373,8 +344,7 @@
         if (response.ok) {
           const data = await response.json();
           showStartGameModal = false;
-          gameStarted = true;
-          updateGameState(data);
+          game = data; // Update game state directly
         }
       } catch (error) {
         console.error('Error starting game:', error);
@@ -382,7 +352,6 @@
     } else {
       // Player O just updates their local state
       showStartGameModal = false;
-      gameStarted = true;
     }
   }
 
@@ -399,7 +368,7 @@
     }
     
     // Poll every second during active games, every 3 seconds while waiting
-    const interval = (playerO && !gameOver) ? 1000 : 3000;
+    const interval = (playerO && !game?.game_over) ? 1000 : 3000;
     pollInterval = setInterval(fetchGameState, interval);
   }
 </script>
@@ -408,16 +377,16 @@
   <div class="loading">Loading...</div>
 {:else if !player?.name}
   <PlayerNameModal />
-{:else}
+{:else if game}
 <main>
   <div class="game-info">
-    {#if !gameStarted && !gameOver}
+    {#if !game.game_started && !game.game_over}
       <!-- Before game starts -->
       <button class="share" on:click={copyGameUrl}>
         {showCopiedMessage ? 'URL Copied!' : 'Share Game URL'}
       </button>
       <button class="home" on:click={() => navigate('/')}>Cancel</button>
-    {:else if gameStarted && !gameOver}
+    {:else if game.game_started && !game.game_over}
       <!-- During active game -->
       {#if isPlayer}
         <div class="resign-container">
@@ -437,15 +406,15 @@
           {/if}
         </div>
       {/if}
-    {:else if gameOver}
+    {:else if game.game_over}
       <!-- After game ends -->
       <button class="home" on:click={() => navigate('/')}>Back to Home</button>
       <button class="analyze" disabled>Analyze Moves</button>
     {/if}
   </div>
 
-  <div class="game-header" class:mobile-hidden={gameStarted && !gameOver}>
-    <h1>{gameName}</h1>
+  <div class="game-header" class:mobile-hidden={game.game_started && !game.game_over}>
+    <h1>{game.name}</h1>
     
     <div class="players">
       <div class="player player-x">
@@ -453,9 +422,11 @@
         {#if playerX}
           <div class="player-stats">
             {#if playerSymbol === 'X'}
+              <span>ELO: {player.elo}</span>
               <span>Wins: {player.wins}</span>
               <span>Win Rate: {calculateWinRate(player)}%</span>
             {:else if opponent}
+              <span>ELO: {opponent.elo}</span>
               <span>Wins: {opponent.wins || 0}</span>
               <span>Win Rate: {calculateWinRate(opponent)}%</span>
             {/if}
@@ -467,9 +438,11 @@
         {#if playerO}
           <div class="player-stats">
             {#if playerSymbol === 'O'}
+              <span>ELO: {player.elo}</span>
               <span>Wins: {player.wins}</span>
               <span>Win Rate: {calculateWinRate(player)}%</span>
             {:else if opponent}
+              <span>ELO: {opponent.elo}</span>
               <span>Wins: {opponent.wins || 0}</span>
               <span>Win Rate: {calculateWinRate(opponent)}%</span>
             {/if}
@@ -479,9 +452,9 @@
     </div>
   </div>
 
-  <div class:game-active-view={gameStarted && !gameOver}>
+  <div class:game-active-view={game.game_started && !game.game_over}>
     <div class="time-display">
-      {#if gameStarted}
+      {#if game.game_started}
         <div class="player x">X Time: {formatTime(displayedXTimeRemaining)}</div>
         <div class="player o">O Time: {formatTime(displayedOTimeRemaining)}</div>
       {:else}
@@ -491,43 +464,43 @@
     </div>
 
     <div class="status">
-      {#if winner}
-        Winner: {winner === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}!
-      {:else if gameOver}
+      {#if game.winner}
+        Winner: {game.winner === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}!
+      {:else if game.game_over}
         Game Over - Draw!
       {:else if !isPlayer}
-        {#if currentPlayer === "X" && !playerO}
+        {#if game.current_player === "X" && !playerO}
           Waiting for player O to join...
         {:else}
-          Spectating - {currentPlayer === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}'s turn
+          Spectating - {game.current_player === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}'s turn
         {/if}
       {:else if !playerO}
         Waiting for another player to join...
-      {:else if currentPlayer === playerSymbol}
+      {:else if game.current_player === playerSymbol}
         Your turn ({playerSymbol})
-        {#if nextBoard !== null}
-          - Must play in board {nextBoard + 1}
+        {#if game.next_board !== null}
+          - Must play in board {game.next_board + 1}
         {:else}
           - You can play in any available board
         {/if}
       {:else}
-        Waiting for {currentPlayer === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)} to move...
+        Waiting for {game.current_player === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)} to move...
       {/if}
     </div>
 
-    <div class="super-board {winner ? winner.toLowerCase() : ''}">
+    <div class="super-board {game.winner ? game.winner.toLowerCase() : ''}">
       {#each Array(9) as _, boardIndex}
         <div class={getBoardClass(boardIndex)}>
-          {#if metaBoard[boardIndex]}
-            <div class="board-winner {metaBoard[boardIndex].toLowerCase()}">
-              {metaBoard[boardIndex] === 'T' ? 'Tie' : metaBoard[boardIndex]}
+          {#if game.meta_board[boardIndex]}
+            <div class="board-winner {game.meta_board[boardIndex].toLowerCase()}">
+              {game.meta_board[boardIndex] === 'T' ? 'Tie' : game.meta_board[boardIndex]}
             </div>
           {:else}
-            {#each boards[boardIndex] as cell, position}
+            {#each game.boards[boardIndex] as cell, position}
               <button 
                 class="cell {cell.toLowerCase()}" 
                 on:click={() => makeMove(boardIndex, position)}
-                disabled={!isPlayer || currentPlayer !== playerSymbol || cell || !isBoardPlayable(boardIndex)}
+                disabled={!isPlayer || game.current_player !== playerSymbol || cell || !isBoardPlayable(boardIndex)}
               >
                 {cell}
               </button>
@@ -558,14 +531,17 @@
 
   {#if showGameEndModal}
     <GameEndModal
-      isWinner={winner === playerSymbol}
-      isDraw={gameOver && !winner}
+      isWinner={game.winner === playerSymbol}
+      isDraw={game.game_over && !game.winner}
       playerName={player.name}
       stats={player}
+      eloChange={playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change}
       on:dismiss={dismissGameEndModal}
     />
   {/if}
 </main>
+{:else}
+  <div class="loading">Loading game data...</div>
 {/if}
 
 <style>

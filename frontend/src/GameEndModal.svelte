@@ -11,6 +11,7 @@
   export let isDraw;
   export let playerName;
   export let stats;
+  export let eloChange;
   
   let confetti;
   
@@ -86,9 +87,21 @@
       <p class="message">You played well!</p>
     {/if}
 
+    <div class="elo-change {eloChange > 0 ? 'positive' : eloChange < 0 ? 'negative' : 'neutral'}">
+      <span class="elo-label">ELO Rating Change:</span>
+      <span class="elo-value">
+        {eloChange > 0 ? '+' : ''}{eloChange}
+      </span>
+      <span class="new-elo">New Rating: {stats.elo}</span>
+    </div>
+
     <div class="stats">
       <h3>Your Statistics</h3>
       <div class="stat-grid">
+        <div class="stat elo">
+          <span class="label">ELO Rating</span>
+          <span class="value">{stats.elo}</span>
+        </div>
         <div class="stat">
           <span class="label">Wins</span>
           <span class="value">{stats.wins}</span>
@@ -100,6 +113,10 @@
         <div class="stat">
           <span class="label">Draws</span>
           <span class="value">{stats.draws}</span>
+        </div>
+        <div class="stat">
+          <span class="label">Total Games</span>
+          <span class="value">{calculateTotalGames(stats)}</span>
         </div>
         <div class="stat">
           <span class="label">Win Rate</span>
@@ -296,5 +313,68 @@
     .stat-grid {
       grid-template-columns: 1fr;
     }
+  }
+
+  .elo-change {
+    background: #f5f5f5;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    font-size: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .elo-change.positive {
+    background: #e8f5e9;
+    border: 2px solid #2e7d32;
+  }
+
+  .elo-change.negative {
+    background: #ffebee;
+    border: 2px solid #c62828;
+  }
+
+  .elo-change.neutral {
+    background: #e3f2fd;
+    border: 2px solid #1565c0;
+  }
+
+  .elo-label {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+
+  .elo-value {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+
+  .elo-value.positive {
+    color: #2e7d32;
+  }
+
+  .elo-value.negative {
+    color: #c62828;
+  }
+
+  .new-elo {
+    font-size: 1rem;
+    color: #424242;
+  }
+
+  .stat.elo {
+    grid-column: span 2;
+    background: #e8f5e9;
+    border: 2px solid #2e7d32;
+  }
+
+  .stat.elo .value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #2e7d32;
   }
 </style> 
