@@ -37,8 +37,11 @@
   let showCopiedMessage = false;
   let hasTriedToJoin = false;
   let showGameEndModal = false;
+  let gameEndModalDismissed = false;
   let showStartGameModal = false;
+  let startGameModalShown = false; // Track if start game modal has been shown
   let isLoading = true;
+  let showResignConfirm = false;
 
   // Timing variables
   let lastUpdateTime = null;
@@ -72,7 +75,7 @@
     hasTriedToJoin = false;
   }
 
-  $: if (gameOver && !showGameEndModal) {
+  $: if (gameOver && !showGameEndModal && !gameEndModalDismissed) {
     if (isPlayer) {
       showGameEndModal = true;
       // Refresh player data to show updated stats in modal
@@ -82,7 +85,7 @@
 
   $: isMyTurn = currentPlayer === 'X' ? playerX === $playerId : playerO === $playerId;
   $: timeRemaining = currentPlayer === 'X' ? displayedXTimeRemaining : displayedOTimeRemaining;
-  $: showWarning = isMyTurn && timeRemaining !== null && timeRemaining <= 25 && !gameOver;
+  $: showWarning = isMyTurn && (warningCountdown !== null || (timeRemaining !== null && timeRemaining <= 25)) && !gameOver;
 
   function updateDisplayTimes() {
     if (gameOver || lastUpdateTime === null) return;
@@ -102,7 +105,7 @@
       }
       
       // Check for warning conditions based on inactivity
-      if (isMyTurn && elapsed >= 15) {  // Show warning after 15 seconds of inactivity
+      if (isMyTurn && elapsed >= 15 && !warningInterval) {  // Show warning after 15 seconds of inactivity
         startWarningCountdown();
       }
     }
@@ -170,10 +173,12 @@
       nextBoard = data.next_board;
       gameStarted = data.game_started;
       
-      // Check if player O just joined or game ended
-      if ((!hadPlayerO && playerO) || gameOver) {
+      // Determine if we need to fetch opponent data
+      const needToFetchOpponent = (!opponent && (playerX || playerO)) || (!hadPlayerO && playerO) || gameOver;
+      
+      // Fetch opponent stats when needed
+      if (needToFetchOpponent) {
         updatePollingInterval();
-        // Fetch opponent stats when they join
         const opponentId = $playerId === playerX ? playerO : playerX;
         if (opponentId) {
           try {
@@ -186,8 +191,9 @@
       }
       
       // Check if second player just joined
-      if (playerO && !gameStarted && !showStartGameModal) {
+      if (playerO && !gameStarted && !showStartGameModal && !startGameModalShown) {
         showStartGameModal = true;
+        startGameModalShown = true; // Mark that we've shown the modal
       }
       
       // Update server times
@@ -338,10 +344,21 @@
     updateTimesFromServer(data.player_x.time_remaining, data.player_o.time_remaining);
 
     if (gameOver) {
-      showGameEndModal = true;
+      // Only show the modal if it hasn't been dismissed yet
+      if (!gameEndModalDismissed) {
+        showGameEndModal = true;
+      }
       clearInterval(pollInterval);
       clearInterval(timeUpdateInterval);
       clearInterval(warningInterval);
+    } else {
+      // Reset the dismissed flag when a new game starts
+      gameEndModalDismissed = false;
+      
+      // Reset the start game modal flag if the game is completely reset
+      if (!data.game_started && !data.player_o.id) {
+        startGameModalShown = false;
+      }
     }
   }
 
@@ -371,6 +388,7 @@
 
   function dismissGameEndModal() {
     showGameEndModal = false;
+    gameEndModalDismissed = true;
   }
 
   // Add this function to update polling frequency
@@ -399,24 +417,52 @@
       {showCopiedMessage ? 'URL Copied!' : 'Share Game URL'}
     </button>
     <button class="home" on:click={() => navigate('/')}>Back to Home</button>
+    {#if isPlayer && !gameOver && playerO}
+      <div class="resign-container">
+        {#if showResignConfirm}
+          <div class="resign-confirm">
+            <span>Resign game?</span>
+            <div class="resign-buttons">
+              <button class="confirm" on:click={() => {
+                resignGame();
+                showResignConfirm = false;
+              }}>Yes</button>
+              <button class="cancel" on:click={() => showResignConfirm = false}>No</button>
+            </div>
+          </div>
+        {:else}
+          <button class="resign" on:click={() => showResignConfirm = true}>Resign Game</button>
+        {/if}
+      </div>
+    {/if}
   </div>
 
   <div class="players">
     <div class="player player-x">
       <strong>Player X:</strong> {playerX ? (playerSymbol === 'X' ? player.name : opponent?.name) || 'Waiting...' : 'Waiting...'}
-      {#if playerX && playerSymbol === 'X'}
+      {#if playerX}
         <div class="player-stats">
-          <span>Wins: {player.wins}</span>
-          <span>Win Rate: {calculateWinRate(player)}%</span>
+          {#if playerSymbol === 'X'}
+            <span>Wins: {player.wins}</span>
+            <span>Win Rate: {calculateWinRate(player)}%</span>
+          {:else if opponent}
+            <span>Wins: {opponent.wins || 0}</span>
+            <span>Win Rate: {calculateWinRate(opponent)}%</span>
+          {/if}
         </div>
       {/if}
     </div>
     <div class="player player-o">
       <strong>Player O:</strong> {playerO ? (playerSymbol === 'O' ? player.name : opponent?.name) || 'Waiting...' : 'Waiting...'}
-      {#if playerO && opponent}
+      {#if playerO}
         <div class="player-stats">
-          <span>Wins: {opponent.wins || 0}</span>
-          <span>Win Rate: {calculateWinRate(opponent)}%</span>
+          {#if playerSymbol === 'O'}
+            <span>Wins: {player.wins}</span>
+            <span>Win Rate: {calculateWinRate(player)}%</span>
+          {:else if opponent}
+            <span>Wins: {opponent.wins || 0}</span>
+            <span>Win Rate: {calculateWinRate(opponent)}%</span>
+          {/if}
         </div>
       {/if}
     </div>
@@ -434,7 +480,9 @@
 
   {#if showWarning}
     <div class="time-warning">
-      Warning: Make a move in {warningCountdown} seconds or forfeit the game!
+      {#if warningCountdown !== null}
+        Warning: Please a move in {warningCountdown} seconds or you will forfeit the game
+      {/if}
     </div>
   {/if}
 
@@ -489,8 +537,8 @@
     <StartGameModal
       playerXName={playerX ? (playerSymbol === 'X' ? player.name : opponent?.name) : 'Unknown'}
       playerOName={playerO ? (playerSymbol === 'O' ? player.name : opponent?.name) : 'Unknown'}
-      playerXStats={playerSymbol === 'X' ? player : opponent}
-      playerOStats={playerSymbol === 'O' ? player : opponent}
+      playerXStats={$playerId === playerX ? player : opponent}
+      playerOStats={$playerId === playerO ? player : opponent}
       on:start={handleGameStart}
     />
   {/if}
@@ -566,6 +614,7 @@
   .super-board {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
     gap: 20px;
     margin-bottom: 2rem;
     padding: 20px;
@@ -573,6 +622,9 @@
     border-radius: 8px;
     border: 3px solid #9e9e9e;  /* Default gray border */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);  /* Nice shadow for meta board */
+    width: 500px;
+    height: 500px;
+    box-sizing: border-box;
   }
 
   /* Add winner colors for meta board */
@@ -589,6 +641,7 @@
   .small-board {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
     gap: 4px;
     padding: 8px;
     background: #f5f5f5;
@@ -599,6 +652,11 @@
     position: relative;
     border: 2px solid #9e9e9e;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);  /* Subtle shadow for all boards */
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    min-width: 120px;
+    min-height: 120px;
   }
 
   .small-board.playable {
@@ -645,6 +703,9 @@
     font-weight: bold;
     text-align: center;
     border-radius: 4px;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
   }
 
   .board-winner.x {
@@ -666,8 +727,10 @@
   }
 
   .cell {
-    width: 40px;
-    height: 40px;
+    width: 100%;
+    height: 100%;
+    min-width: 30px;
+    min-height: 30px;
     font-size: 1.2rem;
     font-weight: bold;
     border: 1px solid #ccc;
@@ -679,6 +742,7 @@
     align-items: center;
     padding: 0;
     line-height: 1;
+    box-sizing: border-box;
   }
 
   .cell:disabled {
@@ -732,6 +796,15 @@
     background-color: #616161;
   }
 
+  .resign {
+    background-color: #f44336;
+    color: white;
+  }
+
+  .resign:hover {
+    background-color: #d32f2f;
+  }
+
   .time-display {
     font-size: 1.2rem;
     margin: 10px 0;
@@ -752,5 +825,69 @@
     height: 100vh;
     font-size: 1.2rem;
     color: #666;
+  }
+
+  .resign-container {
+    height: 42px; /* Match the height of the standard buttons */
+    display: flex;
+    align-items: center;
+  }
+
+  .resign {
+    background-color: #f44336;
+    color: white;
+    height: 100%;
+  }
+
+  .resign:hover {
+    background-color: #d32f2f;
+  }
+
+  .resign-confirm {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    background-color: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0 0.75rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    height: 100%;
+  }
+
+  .resign-confirm span {
+    font-weight: bold;
+    color: #333;
+    margin-right: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .resign-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .resign-buttons button {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.9rem;
+    min-width: 40px;
+  }
+
+  .confirm {
+    background-color: #f44336;
+    color: white;
+  }
+
+  .confirm:hover {
+    background-color: #d32f2f;
+  }
+
+  .cancel {
+    background-color: #9e9e9e;
+    color: white;
+  }
+
+  .cancel:hover {
+    background-color: #757575;
   }
 </style> 
