@@ -81,6 +81,7 @@
     width: 90%;
     text-align: center;
     animation: slideIn 0.3s ease-out;
+    box-sizing: border-box;
   }
 
   .players {
@@ -88,6 +89,7 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
+    flex-wrap: wrap;
   }
 
   .player {
@@ -139,5 +141,54 @@
     0% { opacity: 1; }
     50% { opacity: 0.7; }
     100% { opacity: 1; }
+  }
+
+  /* Media queries for responsive design */
+  @media (max-width: 600px) {
+    .modal {
+      padding: 1.5rem;
+      width: 95%;
+    }
+
+    .players {
+      flex-direction: column;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .player {
+      width: 100%;
+      padding: 0.5rem;
+    }
+
+    .vs {
+      margin: 0.5rem 0;
+      font-size: 1.5rem;
+    }
+
+    h2 {
+      font-size: 1.3rem;
+      margin: 0.5rem 0;
+    }
+
+    .stats {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+    }
+
+    .countdown {
+      font-size: 1.3rem;
+      margin-top: 1.5rem;
+    }
+  }
+
+  @media (max-width: 400px) {
+    .modal {
+      padding: 1rem;
+    }
+
+    .stats {
+      font-size: 0.9rem;
+    }
   }
 </style> 

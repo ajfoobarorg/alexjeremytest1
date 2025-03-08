@@ -20,6 +20,7 @@ class Player(BaseModel):
     wins = IntegerField(default=0)
     losses = IntegerField(default=0)
     draws = IntegerField(default=0)
+    elo = IntegerField(default=800)  # Default ELO rating for new players
 
 class Game(BaseModel):
     """Game model representing a single game of Ultimate Tic-Tac-Toe."""
@@ -46,6 +47,10 @@ class Game(BaseModel):
     player_x_time_used = IntegerField(default=0)  # Time used in seconds
     player_o_time_used = IntegerField(default=0)  # Time used in seconds
     TOTAL_TIME_ALLOWED = 360  # 6 minutes in seconds
+    
+    # ELO tracking
+    player_x_elo_change = IntegerField(null=True)  # ELO change for player X
+    player_o_elo_change = IntegerField(null=True)  # ELO change for player O
     
     # JSON fields
     meta_board = TextField(default=json.dumps(["" for _ in range(9)]))
@@ -78,6 +83,10 @@ class Game(BaseModel):
     # Since we have special logic here for the boards, we must override the default to_dict method
     def to_dict(self):
         """Convert model to dictionary for API response."""
+        # Get player ELO ratings if available
+        player_x_elo = self.player_x.elo if self.player_x else None
+        player_o_elo = self.player_o.elo if self.player_o else None
+        
         return {
             'id': self.id,
             'name': self.name,
@@ -91,12 +100,16 @@ class Game(BaseModel):
             'player_x': {
                 'id': self.player_x.id if self.player_x else None,
                 'name': self.player_x_name,
-                'time_remaining': self.get_time_remaining('X')
+                'time_remaining': self.get_time_remaining('X'),
+                'elo': player_x_elo,
+                'elo_change': self.player_x_elo_change
             },
             'player_o': {
                 'id': self.player_o.id if self.player_o else None,
                 'name': self.player_o_name,
-                'time_remaining': self.get_time_remaining('O')
+                'time_remaining': self.get_time_remaining('O'),
+                'elo': player_o_elo,
+                'elo_change': self.player_o_elo_change
             },
             'game_started': self.game_started
         }
