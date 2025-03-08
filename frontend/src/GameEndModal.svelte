@@ -142,6 +142,7 @@
     width: 90%;
     text-align: center;
     animation: slideIn 0.3s ease-out;
+    box-sizing: border-box;
   }
 
   @keyframes slideIn {
@@ -209,6 +210,7 @@
     justify-content: center;
     gap: 1rem;
     margin-top: 1.5rem;
+    flex-wrap: wrap;
   }
 
   .dismiss-button, .home-button {
@@ -238,5 +240,61 @@
 
   .home-button:hover {
     background-color: #45a049;
+  }
+
+  /* Media queries for responsive design */
+  @media (max-width: 600px) {
+    .modal {
+      padding: 1.5rem;
+      width: 95%;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+    }
+
+    .message {
+      font-size: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stats {
+      padding: 1rem;
+    }
+
+    .stat-grid {
+      gap: 0.5rem;
+    }
+
+    .stat {
+      padding: 0.75rem;
+    }
+
+    .value {
+      font-size: 1.2rem;
+    }
+
+    .button-container {
+      gap: 0.5rem;
+    }
+
+    .dismiss-button, .home-button {
+      padding: 0.6rem 1rem;
+      font-size: 0.9rem;
+    }
+  }
+
+  @media (max-width: 400px) {
+    .modal {
+      padding: 1rem;
+    }
+
+    h2 {
+      font-size: 1.3rem;
+    }
+
+    .stat-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style> 

@@ -410,127 +410,140 @@
   <PlayerNameModal />
 {:else}
 <main>
-  <h1>{gameName}</h1>
-  
   <div class="game-info">
-    <button class="share" on:click={copyGameUrl}>
-      {showCopiedMessage ? 'URL Copied!' : 'Share Game URL'}
-    </button>
-    <button class="home" on:click={() => navigate('/')}>Back to Home</button>
-    {#if isPlayer && !gameOver && playerO}
-      <div class="resign-container">
-        {#if showResignConfirm}
-          <div class="resign-confirm">
-            <span>Resign game?</span>
-            <div class="resign-buttons">
-              <button class="confirm" on:click={() => {
-                resignGame();
-                showResignConfirm = false;
-              }}>Yes</button>
-              <button class="cancel" on:click={() => showResignConfirm = false}>No</button>
+    {#if !gameStarted && !gameOver}
+      <!-- Before game starts -->
+      <button class="share" on:click={copyGameUrl}>
+        {showCopiedMessage ? 'URL Copied!' : 'Share Game URL'}
+      </button>
+      <button class="home" on:click={() => navigate('/')}>Cancel</button>
+    {:else if gameStarted && !gameOver}
+      <!-- During active game -->
+      {#if isPlayer}
+        <div class="resign-container">
+          {#if showResignConfirm}
+            <div class="resign-confirm">
+              <span>Resign game?</span>
+              <div class="resign-buttons">
+                <button class="confirm" on:click={() => {
+                  resignGame();
+                  showResignConfirm = false;
+                }}>Yes</button>
+                <button class="cancel" on:click={() => showResignConfirm = false}>No</button>
+              </div>
             </div>
-          </div>
-        {:else}
-          <button class="resign" on:click={() => showResignConfirm = true}>Resign Game</button>
-        {/if}
-      </div>
-    {/if}
-  </div>
-
-  <div class="players">
-    <div class="player player-x">
-      <strong>Player X:</strong> {playerX ? (playerSymbol === 'X' ? player.name : opponent?.name) || 'Waiting...' : 'Waiting...'}
-      {#if playerX}
-        <div class="player-stats">
-          {#if playerSymbol === 'X'}
-            <span>Wins: {player.wins}</span>
-            <span>Win Rate: {calculateWinRate(player)}%</span>
-          {:else if opponent}
-            <span>Wins: {opponent.wins || 0}</span>
-            <span>Win Rate: {calculateWinRate(opponent)}%</span>
+          {:else}
+            <button class="resign" on:click={() => showResignConfirm = true}>Resign Game</button>
           {/if}
         </div>
       {/if}
-    </div>
-    <div class="player player-o">
-      <strong>Player O:</strong> {playerO ? (playerSymbol === 'O' ? player.name : opponent?.name) || 'Waiting...' : 'Waiting...'}
-      {#if playerO}
-        <div class="player-stats">
-          {#if playerSymbol === 'O'}
-            <span>Wins: {player.wins}</span>
-            <span>Win Rate: {calculateWinRate(player)}%</span>
-          {:else if opponent}
-            <span>Wins: {opponent.wins || 0}</span>
-            <span>Win Rate: {calculateWinRate(opponent)}%</span>
-          {/if}
-        </div>
-      {/if}
-    </div>
-  </div>
-
-  <div class="time-display">
-    {#if gameStarted}
-      <div class="player x">X Time: {formatTime(displayedXTimeRemaining)}</div>
-      <div class="player o">O Time: {formatTime(displayedOTimeRemaining)}</div>
-    {:else}
-      <div class="player x">X Time: 6:00</div>
-      <div class="player o">O Time: 6:00</div>
-    {/if}
-  </div>
-
-  {#if showWarning}
-    <div class="time-warning">
-      {#if warningCountdown !== null}
-        Warning: Please a move in {warningCountdown} seconds or you will forfeit the game
-      {/if}
-    </div>
-  {/if}
-
-  <div class="status">
-    {#if winner}
-      Winner: {winner === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}!
     {:else if gameOver}
-      Game Over - Draw!
-    {:else if !isPlayer}
-      {#if currentPlayer === "X" && !playerO}
-        Waiting for player O to join...
-      {:else}
-        Spectating - {currentPlayer === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}'s turn
-      {/if}
-    {:else if !playerO}
-      Waiting for another player to join...
-    {:else if currentPlayer === playerSymbol}
-      Your turn ({playerSymbol})
-      {#if nextBoard !== null}
-        - Must play in board {nextBoard + 1}
-      {:else}
-        - You can play in any available board
-      {/if}
-    {:else}
-      Waiting for {currentPlayer === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)} to move...
+      <!-- After game ends -->
+      <button class="home" on:click={() => navigate('/')}>Back to Home</button>
+      <button class="analyze" disabled>Analyze Moves</button>
     {/if}
   </div>
 
-  <div class="super-board {winner ? winner.toLowerCase() : ''}">
-    {#each Array(9) as _, boardIndex}
-      <div class={getBoardClass(boardIndex)}>
-        {#if metaBoard[boardIndex]}
-          <div class="board-winner {metaBoard[boardIndex].toLowerCase()}">
-            {metaBoard[boardIndex] === 'T' ? 'Tie' : metaBoard[boardIndex]}
+  <div class="game-header" class:mobile-hidden={gameStarted && !gameOver}>
+    <h1>{gameName}</h1>
+    
+    <div class="players">
+      <div class="player player-x">
+        <strong>Player X:</strong> {playerX ? (playerSymbol === 'X' ? player.name : opponent?.name) || 'Waiting...' : 'Waiting...'}
+        {#if playerX}
+          <div class="player-stats">
+            {#if playerSymbol === 'X'}
+              <span>Wins: {player.wins}</span>
+              <span>Win Rate: {calculateWinRate(player)}%</span>
+            {:else if opponent}
+              <span>Wins: {opponent.wins || 0}</span>
+              <span>Win Rate: {calculateWinRate(opponent)}%</span>
+            {/if}
           </div>
-        {:else}
-          {#each boards[boardIndex] as cell, position}
-            <button 
-              class="cell {cell.toLowerCase()}" 
-              on:click={() => makeMove(boardIndex, position)}
-              disabled={!isPlayer || currentPlayer !== playerSymbol || cell || !isBoardPlayable(boardIndex)}
-            >
-              {cell}
-            </button>
-          {/each}
         {/if}
       </div>
-    {/each}
+      <div class="player player-o">
+        <strong>Player O:</strong> {playerO ? (playerSymbol === 'O' ? player.name : opponent?.name) || 'Waiting...' : 'Waiting...'}
+        {#if playerO}
+          <div class="player-stats">
+            {#if playerSymbol === 'O'}
+              <span>Wins: {player.wins}</span>
+              <span>Win Rate: {calculateWinRate(player)}%</span>
+            {:else if opponent}
+              <span>Wins: {opponent.wins || 0}</span>
+              <span>Win Rate: {calculateWinRate(opponent)}%</span>
+            {/if}
+          </div>
+        {/if}
+      </div>
+    </div>
+  </div>
+
+  <div class:game-active-view={gameStarted && !gameOver}>
+    <div class="time-display">
+      {#if gameStarted}
+        <div class="player x">X Time: {formatTime(displayedXTimeRemaining)}</div>
+        <div class="player o">O Time: {formatTime(displayedOTimeRemaining)}</div>
+      {:else}
+        <div class="player x">X Time: 6:00</div>
+        <div class="player o">O Time: 6:00</div>
+      {/if}
+    </div>
+
+    <div class="status">
+      {#if winner}
+        Winner: {winner === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}!
+      {:else if gameOver}
+        Game Over - Draw!
+      {:else if !isPlayer}
+        {#if currentPlayer === "X" && !playerO}
+          Waiting for player O to join...
+        {:else}
+          Spectating - {currentPlayer === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}'s turn
+        {/if}
+      {:else if !playerO}
+        Waiting for another player to join...
+      {:else if currentPlayer === playerSymbol}
+        Your turn ({playerSymbol})
+        {#if nextBoard !== null}
+          - Must play in board {nextBoard + 1}
+        {:else}
+          - You can play in any available board
+        {/if}
+      {:else}
+        Waiting for {currentPlayer === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)} to move...
+      {/if}
+    </div>
+
+    <div class="super-board {winner ? winner.toLowerCase() : ''}">
+      {#each Array(9) as _, boardIndex}
+        <div class={getBoardClass(boardIndex)}>
+          {#if metaBoard[boardIndex]}
+            <div class="board-winner {metaBoard[boardIndex].toLowerCase()}">
+              {metaBoard[boardIndex] === 'T' ? 'Tie' : metaBoard[boardIndex]}
+            </div>
+          {:else}
+            {#each boards[boardIndex] as cell, position}
+              <button 
+                class="cell {cell.toLowerCase()}" 
+                on:click={() => makeMove(boardIndex, position)}
+                disabled={!isPlayer || currentPlayer !== playerSymbol || cell || !isBoardPlayable(boardIndex)}
+              >
+                {cell}
+              </button>
+            {/each}
+          {/if}
+        </div>
+      {/each}
+    </div>
+
+    {#if showWarning}
+      <div class="time-warning">
+        {#if warningCountdown !== null}
+          Warning: Please make a move in {warningCountdown} seconds or you will forfeit the game
+        {/if}
+      </div>
+    {/if}
   </div>
 
   {#if showStartGameModal}
@@ -562,17 +575,40 @@
     align-items: center;
     padding: 2rem;
     font-family: Arial, sans-serif;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
   }
 
   h1 {
     color: #333;
     margin-bottom: 2rem;
+    text-align: center;
+    width: 100%;
+    word-break: break-word;
   }
 
   .game-info {
     display: flex;
+    justify-content: center;
     gap: 1rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
+    width: 100%;
+    max-width: 500px;
+  }
+
+  .game-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 500px;
+    margin-bottom: 1.5rem;
+  }
+
+  .hidden {
+    display: none;
   }
 
   .players {
@@ -622,8 +658,10 @@
     border-radius: 8px;
     border: 3px solid #9e9e9e;  /* Default gray border */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);  /* Nice shadow for meta board */
-    width: 500px;
-    height: 500px;
+    width: 100%;
+    max-width: 500px;
+    height: auto;
+    aspect-ratio: 1 / 1;
     box-sizing: border-box;
   }
 
@@ -889,5 +927,161 @@
 
   .cancel:hover {
     background-color: #757575;
+  }
+
+  /* Media queries for responsive design */
+  @media (max-width: 600px) {
+    main {
+      padding: 0.75rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .game-info {
+      margin-bottom: 0.5rem;
+    }
+
+    /* Hide game header during active gameplay on mobile */
+    .mobile-hidden {
+      display: none;
+    }
+
+    .super-board {
+      gap: 10px;
+      padding: 10px;
+      margin-bottom: 1rem;
+    }
+
+    .small-board {
+      min-width: 80px;
+      min-height: 80px;
+      padding: 4px;
+      gap: 2px;
+    }
+
+    .board-winner {
+      font-size: 2.5rem;
+    }
+
+    .cell {
+      min-width: 20px;
+      min-height: 20px;
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1rem;
+      font-size: 0.9rem;
+    }
+
+    .game-info {
+      gap: 0.5rem;
+    }
+
+    .players {
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .time-display {
+      width: 100%;
+      justify-content: space-around;
+      margin: 0.5rem 0;
+      font-size: 1rem;
+    }
+
+    .status {
+      font-size: 1rem;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    /* Compact game view */
+    .game-active-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    .game-active-view .time-display {
+      order: 1;
+      margin-bottom: 0.5rem;
+    }
+
+    .game-active-view .status {
+      order: 2;
+      margin-bottom: 0.5rem;
+    }
+
+    .game-active-view .super-board {
+      order: 3;
+    }
+
+    .game-active-view .time-warning {
+      order: 4;
+      margin-top: 0.5rem;
+    }
+  }
+
+  @media (max-width: 400px) {
+    main {
+      padding: 0.5rem;
+    }
+
+    .super-board {
+      gap: 5px;
+      padding: 5px;
+    }
+
+    .small-board {
+      min-width: 60px;
+      min-height: 60px;
+      padding: 2px;
+      gap: 1px;
+    }
+
+    .board-winner {
+      font-size: 2rem;
+    }
+
+    .cell {
+      min-width: 15px;
+      min-height: 15px;
+      font-size: 0.9rem;
+    }
+
+    button {
+      padding: 0.5rem 0.8rem;
+      font-size: 0.8rem;
+    }
+
+    .time-display {
+      font-size: 0.9rem;
+    }
+
+    .status {
+      font-size: 0.9rem;
+    }
+  }
+
+  .analyze {
+    background-color: #9C27B0;
+    color: white;
+  }
+
+  .analyze:hover:not([disabled]) {
+    background-color: #7B1FA2;
+  }
+
+  .analyze[disabled] {
+    background-color: #E1BEE7;
+    cursor: not-allowed;
+    opacity: 0.7;
   }
 </style> 
