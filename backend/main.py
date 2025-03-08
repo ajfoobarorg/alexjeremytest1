@@ -223,21 +223,63 @@ async def join_game(game_id: str, request: JoinGameRequest):
     except GameModel.DoesNotExist:
         raise HTTPException(status_code=404, detail="Game not found")
 
+@app.post("/games/{game_id}/resign")
+async def resign_game(game_id: str, player_id: str):
+    try:
+        game = GameModel.get(GameModel.id == game_id)
+        
+        # Verify player is in the game
+        if player_id not in [game.player_x, game.player_o]:
+            raise HTTPException(status_code=403, detail="Not a player in this game")
+        
+        # Set the winner to the other player
+        game.winner = 'O' if player_id == game.player_x else 'X'
+        game.game_over = True
+        game.save()
+        
+        # Update stats
+        stats = GameStatsModel.get()
+        stats.completed_games += 1
+        stats.ongoing_games -= 1
+        if game.winner == 'X':
+            stats.x_wins += 1
+        else:
+            stats.o_wins += 1
+        stats.save()
+        
+        return game.to_dict()
+    except GameModel.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Game not found")
+
 @app.post("/games/{game_id}/move/{board_index}/{position}")
 async def make_move(game_id: str, board_index: int, position: int, player_id: str):
     try:
         game = GameModel.get(GameModel.id == game_id)
         
-        if not (0 <= board_index <= 8 and 0 <= position <= 8):
-            raise HTTPException(status_code=400, detail="Invalid position")
-        
-        if game.game_over:
-            raise HTTPException(status_code=400, detail="Game is already over")
-        
         # Verify it's the player's turn
-        current_player_id = game.player_x if game.current_player == "X" else game.player_o
-        if current_player_id != player_id:
-            raise HTTPException(status_code=400, detail="Not your turn")
+        current_player_id = game.player_x if game.current_player == 'X' else game.player_o
+        if player_id != current_player_id:
+            raise HTTPException(status_code=403, detail="Not your turn")
+            
+        # Update time used and check if player ran out of time
+        time_remaining = game.update_time_used()
+        if time_remaining <= 0:
+            # Player ran out of time, they lose
+            game.winner = 'O' if game.current_player == 'X' else 'X'
+            game.game_over = True
+            game.save()
+            
+            # Update stats
+            stats = GameStatsModel.get()
+            stats.completed_games += 1
+            stats.ongoing_games -= 1
+            if game.winner == 'X':
+                stats.x_wins += 1
+            else:
+                stats.o_wins += 1
+            stats.save()
+            
+            return game.to_dict()
         
         # Verify the move is in the correct board
         if game.next_board is not None and game.next_board != board_index:
@@ -315,4 +357,27 @@ async def make_move(game_id: str, board_index: int, position: int, player_id: st
 @app.get("/stats")
 async def get_stats():
     stats = GameStatsModel.get()
-    return stats.to_dict() 
+    return stats.to_dict()
+
+@app.post("/games/{game_id}/start")
+async def start_game(game_id: str, player_id: str):
+    try:
+        game = GameModel.get(GameModel.id == game_id)
+        
+        # Verify both players have joined
+        if not game.player_x or not game.player_o:
+            raise HTTPException(status_code=400, detail="Both players must join before starting")
+        
+        # Verify the request is from one of the players
+        if player_id not in [game.player_x, game.player_o]:
+            raise HTTPException(status_code=403, detail="Not a player in this game")
+        
+        # Start the game if not already started
+        if not game.game_started:
+            game.game_started = True
+            game.last_move_time = datetime.now()  # Reset the timer
+            game.save()
+        
+        return game.to_dict()
+    except GameModel.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Game not found") 

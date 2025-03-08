@@ -23,10 +23,41 @@ class Game(BaseModel):
     player_o = CharField(null=True)
     player_x_name = CharField(null=True)
     player_o_name = CharField(null=True)
+    game_started = BooleanField(default=False)
+    
+    # Timing fields
+    last_move_time = DateTimeField(default=datetime.datetime.now)
+    player_x_time_used = IntegerField(default=0)  # Time used in seconds
+    player_o_time_used = IntegerField(default=0)  # Time used in seconds
+    TOTAL_TIME_ALLOWED = 180  # 3 minutes in seconds
     
     # JSON fields
     meta_board = TextField(default=json.dumps(["" for _ in range(9)]))
     boards = TextField(default=json.dumps([[""]*9 for _ in range(9)]))
+    
+    def get_time_remaining(self, player):
+        """Get remaining time for a player in seconds."""
+        if not self.game_started:
+            return self.TOTAL_TIME_ALLOWED
+            
+        time_used = self.player_x_time_used if player == 'X' else self.player_o_time_used
+        return max(0, self.TOTAL_TIME_ALLOWED - time_used)
+    
+    def update_time_used(self):
+        """Update time used by current player based on last move time."""
+        if not self.game_started:
+            return self.TOTAL_TIME_ALLOWED
+            
+        now = datetime.datetime.now()
+        elapsed = int((now - self.last_move_time).total_seconds())
+        
+        if self.current_player == 'X':
+            self.player_x_time_used += elapsed
+        else:
+            self.player_o_time_used += elapsed
+            
+        self.last_move_time = now
+        return self.get_time_remaining(self.current_player)
     
     def to_dict(self):
         """Convert model to dictionary for API response."""
@@ -44,7 +75,11 @@ class Game(BaseModel):
             'player_x': self.player_x,
             'player_o': self.player_o,
             'player_x_name': self.player_x_name,
-            'player_o_name': self.player_o_name
+            'player_o_name': self.player_o_name,
+            'last_move_time': self.last_move_time.isoformat(),
+            'player_x_time_remaining': self.get_time_remaining('X'),
+            'player_o_time_remaining': self.get_time_remaining('O'),
+            'game_started': self.game_started
         }
 
 class GameStats(BaseModel):

@@ -2,6 +2,9 @@
 <script>
   import { onMount } from 'svelte';
   import { playerStats } from './stores.js';
+  import { createEventDispatcher } from 'svelte';
+  
+  const dispatch = createEventDispatcher();
   
   export let isWinner;
   export let isDraw;
@@ -95,6 +98,10 @@
         </div>
       </div>
     </div>
+
+    <button class="dismiss-button" on:click={() => dispatch('close')}>
+      Close
+    </button>
   </div>
 </div>
 
@@ -181,5 +188,21 @@
     font-size: 1.5rem;
     font-weight: bold;
     color: #2e7d32;
+  }
+
+  .dismiss-button {
+    margin-top: 1.5rem;
+    padding: 0.8rem 2rem;
+    background-color: #757575;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .dismiss-button:hover {
+    background-color: #616161;
   }
 </style> 

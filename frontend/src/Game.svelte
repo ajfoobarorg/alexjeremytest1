@@ -1,10 +1,11 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { playerId, playerName, playerStats, updatePlayerStats } from './stores.js';
   import { navigate } from './router.js';
   import PlayerNameModal from './PlayerNameModal.svelte';
   import GameEndModal from './GameEndModal.svelte';
   import { API_BASE_URL } from './config.js';
+  import StartGameModal from './StartGameModal.svelte';
 
   export let gameId;
 
@@ -21,16 +22,30 @@
   let gameName = "";
   let playerXName = null;
   let playerOName = null;
+  let playerX = null;
+  let playerO = null;
   let nextBoard = null;
   let showGameEndModal = false;
   let opponentStats = null;
 
-  // Reset hasTriedToJoin when playerName changes
+  // Timing variables
+  let lastUpdateTime = null;
+  let serverPlayerXTimeRemaining = null;
+  let serverPlayerOTimeRemaining = null;
+  let displayedXTimeRemaining = null;
+  let displayedOTimeRemaining = null;
+  let warningCountdown = null;
+  let warningInterval;
+  let pollInterval;
+  let timeUpdateInterval;
+
+  let showStartGameModal = false;
+  let gameStarted = false;
+
   $: if ($playerName) {
     hasTriedToJoin = false;
   }
 
-  // Show game end modal when game is over
   $: if (gameOver && !showGameEndModal) {
     if (isPlayer) {
       const result = winner === playerSymbol ? 'win' : 
@@ -38,6 +53,47 @@
       updatePlayerStats(result);
       showGameEndModal = true;
     }
+  }
+
+  $: isMyTurn = currentPlayer === 'X' ? playerX === $playerId : playerO === $playerId;
+  $: timeRemaining = currentPlayer === 'X' ? displayedXTimeRemaining : displayedOTimeRemaining;
+  $: showWarning = isMyTurn && timeRemaining !== null && timeRemaining <= 25 && !gameOver;
+
+  function updateDisplayTimes() {
+    if (gameOver || lastUpdateTime === null) return;
+    
+    const now = Date.now();
+    const elapsed = Math.floor((now - lastUpdateTime) / 1000);
+    
+    // Only decrement time for the current player
+    if (currentPlayer === 'X') {
+      displayedXTimeRemaining = Math.max(0, serverPlayerXTimeRemaining - elapsed);
+      displayedOTimeRemaining = serverPlayerOTimeRemaining;
+    } else {
+      displayedOTimeRemaining = Math.max(0, serverPlayerOTimeRemaining - elapsed);
+      displayedXTimeRemaining = serverPlayerXTimeRemaining;
+    }
+    
+    // Check for warning conditions
+    if (isMyTurn && timeRemaining <= 25) {
+      startWarningCountdown();
+    }
+  }
+
+  function updateTimesFromServer(xTime, oTime) {
+    // Don't start timing until both players have joined and countdown is complete
+    if (!gameStarted || !playerO) return;
+
+    // Initialize the timer if this is the first update
+    if (lastUpdateTime === null) {
+      timeUpdateInterval = setInterval(updateDisplayTimes, 100);
+    }
+    
+    serverPlayerXTimeRemaining = xTime;
+    serverPlayerOTimeRemaining = oTime;
+    displayedXTimeRemaining = xTime;
+    displayedOTimeRemaining = oTime;
+    lastUpdateTime = Date.now();
   }
 
   async function tryJoinGame() {
@@ -76,13 +132,21 @@
       gameName = data.name;
       playerXName = data.player_x_name;
       playerOName = data.player_o_name;
+      playerX = data.player_x;
+      playerO = data.player_o;
       nextBoard = data.next_board;
       
-      // Reset player state
+      // Check if second player just joined
+      if (playerO && !gameStarted && !showStartGameModal) {
+        showStartGameModal = true;
+      }
+      
+      // Update server times
+      updateTimesFromServer(data.player_x_time_remaining, data.player_o_time_remaining);
+      
       isPlayer = false;
       playerSymbol = null;
 
-      // Determine if current user is a player and which symbol they are
       if (data.player_x === $playerId) {
         isPlayer = true;
         playerSymbol = "X";
@@ -98,7 +162,6 @@
         }
       }
 
-      // Update game URL to include the actual game ID
       gameUrl = window.location.origin + `/game/${gameId}`;
     } catch (error) {
       console.error('Error fetching game state:', error);
@@ -106,7 +169,7 @@
   }
 
   async function makeMove(boardIndex, position) {
-    if (!isPlayer || currentPlayer !== playerSymbol) return;
+    if (!isMyTurn || gameOver) return;
     if (nextBoard !== null && nextBoard !== boardIndex) return;
     if (metaBoard[boardIndex] !== "") return;
     
@@ -118,12 +181,7 @@
         }
       });
       const data = await response.json();
-      boards = data.boards;
-      metaBoard = data.meta_board;
-      currentPlayer = data.current_player;
-      winner = data.winner;
-      gameOver = data.game_over;
-      nextBoard = data.next_board;
+      updateGameState(data);
     } catch (error) {
       console.error('Error making move:', error);
     }
@@ -155,16 +213,108 @@
     }, 2000);
   }
 
-  // Poll for updates
-  let interval;
-  onMount(() => {
-    fetchGameState();
-    interval = setInterval(fetchGameState, 1000);
-
-    return () => {
-      clearInterval(interval);
-    };
+  onMount(async () => {
+    await fetchGameState();
+    
+    // Poll for game state updates every 3 seconds
+    pollInterval = setInterval(fetchGameState, 3000);
   });
+
+  onDestroy(() => {
+    clearInterval(pollInterval);
+    if (timeUpdateInterval) {
+      clearInterval(timeUpdateInterval);
+    }
+    clearInterval(warningInterval);
+  });
+
+  function startWarningCountdown() {
+    if (!warningInterval && isMyTurn) {
+      warningCountdown = 10;
+      warningInterval = setInterval(() => {
+        warningCountdown--;
+        if (warningCountdown <= 0) {
+          resignGame();
+          clearInterval(warningInterval);
+          warningInterval = null;
+        }
+      }, 1000);
+    }
+  }
+
+  function stopWarningCountdown() {
+    clearInterval(warningInterval);
+    warningInterval = null;
+    warningCountdown = null;
+  }
+
+  async function resignGame() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/games/${gameId}/resign?player_id=${$playerId}`, {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        updateGameState(data);
+      }
+    } catch (error) {
+      console.error('Error resigning game:', error);
+    }
+  }
+
+  function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  function updateGameState(data) {
+    boards = data.boards;
+    metaBoard = data.meta_board;
+    currentPlayer = data.current_player;
+    nextBoard = data.next_board;
+    winner = data.winner;
+    gameOver = data.game_over;
+    playerX = data.player_x;
+    playerO = data.player_o;
+    playerXName = data.player_x_name;
+    playerOName = data.player_o_name;
+    
+    // Update server times
+    updateTimesFromServer(data.player_x_time_remaining, data.player_o_time_remaining);
+
+    if (gameOver) {
+      showGameEndModal = true;
+      clearInterval(pollInterval);
+      clearInterval(timeUpdateInterval);
+      clearInterval(warningInterval);
+    }
+  }
+
+  async function handleGameStart() {
+    if (playerSymbol === 'X') {
+      // Only player X sends the start game API call
+      try {
+        const response = await fetch(`${API_BASE_URL}/games/${gameId}/start?player_id=${$playerId}`, {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          showStartGameModal = false;
+          gameStarted = true;
+          updateGameState(data);
+        }
+      } catch (error) {
+        console.error('Error starting game:', error);
+      }
+    } else {
+      // Player O just updates their local state
+      showStartGameModal = false;
+      gameStarted = true;
+    }
+  }
 </script>
 
 {#if !$playerName}
@@ -186,7 +336,7 @@
       {#if playerXName}
         <div class="player-stats">
           <span>Wins: {$playerStats.wins}</span>
-          <span>Win Rate: {(($playerStats.wins / $playerStats.totalGames) * 100).toFixed(1)}%</span>
+          <span>Win Rate: {$playerStats.totalGames > 0 ? (($playerStats.wins / $playerStats.totalGames) * 100).toFixed(1) : '0.0'}%</span>
         </div>
       {/if}
     </div>
@@ -195,11 +345,27 @@
       {#if playerOName}
         <div class="player-stats">
           <span>Wins: {opponentStats?.wins || 0}</span>
-          <span>Win Rate: {((opponentStats?.wins || 0) / (opponentStats?.totalGames || 1) * 100).toFixed(1)}%</span>
+          <span>Win Rate: {(opponentStats?.totalGames || 0) > 0 ? ((opponentStats?.wins || 0) / (opponentStats?.totalGames || 1) * 100).toFixed(1) : '0.0'}%</span>
         </div>
       {/if}
     </div>
   </div>
+
+  <div class="time-display">
+    {#if gameStarted}
+      <div class="player x">X Time: {formatTime(displayedXTimeRemaining)}</div>
+      <div class="player o">O Time: {formatTime(displayedOTimeRemaining)}</div>
+    {:else}
+      <div class="player x">X Time: 3:00</div>
+      <div class="player o">O Time: 3:00</div>
+    {/if}
+  </div>
+
+  {#if showWarning}
+    <div class="time-warning">
+      Warning: Make a move in {warningCountdown} seconds or forfeit the game!
+    </div>
+  {/if}
 
   <div class="status">
     {#if winner}
@@ -212,6 +378,8 @@
       {:else}
         Spectating - {currentPlayer === 'X' ? playerXName : playerOName}'s turn
       {/if}
+    {:else if !playerO}
+      Waiting for another player to join...
     {:else if currentPlayer === playerSymbol}
       Your turn ({playerSymbol})
       {#if nextBoard !== null}
@@ -245,6 +413,16 @@
       </div>
     {/each}
   </div>
+
+  {#if showStartGameModal}
+    <StartGameModal
+      playerXName={playerXName}
+      playerOName={playerOName}
+      playerXStats={playerSymbol === 'X' ? $playerStats : opponentStats}
+      playerOStats={playerSymbol === 'O' ? $playerStats : opponentStats}
+      on:start={handleGameStart}
+    />
+  {/if}
 
   {#if showGameEndModal}
     <GameEndModal
@@ -480,5 +658,38 @@
 
   .home:hover {
     background-color: #616161;
+  }
+
+  .time-display {
+    font-size: 1.2rem;
+    margin: 10px 0;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .time-warning {
+    color: red;
+    font-weight: bold;
+    animation: pulse 1s infinite;
+  }
+
+  .resign-button {
+    background-color: #ff4444;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 10px 0;
+  }
+
+  .resign-button:hover {
+    background-color: #cc0000;
+  }
+
+  @keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
   }
 </style> 
