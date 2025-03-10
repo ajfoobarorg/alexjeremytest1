@@ -56,7 +56,6 @@
         body: JSON.stringify({
           is_public: isPublic,
           player_id: $playerId,
-          player_name: player.name,
           game_name: gameName.trim()
         }),
       });
@@ -85,36 +84,9 @@
 <main>
   <h1>Ultimate Tic-Tac-Toe</h1>
   
-  <div class="stats-container">
-    <div class="stats personal">
-      <h3>Your Statistics</h3>
-      <div class="stat-grid">
-        <div class="stat elo">
-          <span class="label">ELO Rating</span>
-          <span class="value">{player.elo}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Total Games</span>
-          <span class="value">{calculateTotalGames(player)}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Wins</span>
-          <span class="value">{player.wins}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Losses</span>
-          <span class="value">{player.losses}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Draws</span>
-          <span class="value">{player.draws}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Win Rate</span>
-          <span class="value">{calculateWinRate(player)}%</span>
-        </div>
-      </div>
-    </div>
+  <div class="player-info">
+    <h2 class="player-name">{player.name} <span class="elo">({player.elo})</span></h2>
+    <p class="player-stats">{player.wins} wins / {player.draws} draws / {player.losses} losses</p>
   </div>
 
   <div class="new-game">
@@ -145,7 +117,7 @@
         {#each publicGames as game}
           <div class="game-item">
             <span class="game-name">{game.name}</span>
-            <span class="player-name">Created by: {game.player_x.name}</span>
+            <span class="creator-name">Created by: {game.player_x.name}</span>
             <button on:click={() => navigate(`/game/${game.id}`)}>
               Join Game
             </button>
@@ -176,61 +148,45 @@
     margin-top: 2rem;
   }
 
-  .stats-container {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    margin-bottom: 2rem;
-  }
-
-  .stats {
-    background: #f5f5f5;
+  .player-info {
+    background: #e8f5e9;
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     width: 100%;
     max-width: 600px;
-  }
-
-  .stats.personal {
-    background: #e8f5e9;  /* Light green background for personal stats */
-  }
-
-  .stat-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-    margin-top: 1rem;
-  }
-
-  .stat-item {
-    background: white;
-    padding: 1rem;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin: 0 auto 2rem auto;
+    text-align: center;
+    border: 2px solid #2e7d32;
     transition: transform 0.2s;
   }
 
-  .stat-item:hover {
+  .player-info:hover {
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 
-  .stat-item.highlight {
-    border: 2px solid #4CAF50;
+  .player-name {
+    margin: 0 0 0.5rem 0;
+    color: #2e7d32;
+    font-size: 1.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
-  .label {
-    display: block;
-    color: #666;
-    font-size: 0.9rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .value {
-    display: block;
-    font-size: 1.5rem;
+  .elo {
     font-weight: bold;
     color: #2e7d32;
+    white-space: nowrap;
+  }
+
+  .player-stats {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #424242;
   }
 
   .new-game {
@@ -295,7 +251,7 @@
     font-size: 1.1rem;
   }
 
-  .player-name {
+  .creator-name {
     color: #666;
     font-size: 0.9rem;
   }
@@ -324,15 +280,32 @@
     color: #666;
   }
 
-  .stat.elo {
-    grid-column: span 2;
-    background: #e8f5e9;
-    border: 2px solid #2e7d32;
+  /* Media queries for responsive design */
+  @media (max-width: 600px) {
+    main {
+      padding: 1rem;
+    }
+
+    .player-info {
+      padding: 1rem;
+    }
+
+    .player-name {
+      font-size: 1.5rem;
+    }
+
+    .player-stats {
+      font-size: 1rem;
+    }
   }
 
-  .stat.elo .value {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #2e7d32;
+  @media (max-width: 400px) {
+    .player-name {
+      font-size: 1.3rem;
+    }
+
+    .player-stats {
+      font-size: 0.9rem;
+    }
   }
 </style> 

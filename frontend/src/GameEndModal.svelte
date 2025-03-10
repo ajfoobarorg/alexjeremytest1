@@ -2,7 +2,6 @@
 <script>
   import { onMount } from 'svelte';
   import { createEventDispatcher } from 'svelte';
-  import { calculateTotalGames, calculateWinRate } from './utils.js';
   import { navigate } from './router.js';
   
   const dispatch = createEventDispatcher();
@@ -87,41 +86,17 @@
       <p class="message">You played well!</p>
     {/if}
 
-    <div class="elo-change {eloChange > 0 ? 'positive' : eloChange < 0 ? 'negative' : 'neutral'}">
-      <span class="elo-label">ELO Rating Change:</span>
-      <span class="elo-value">
-        {eloChange > 0 ? '+' : ''}{eloChange}
-      </span>
-      <span class="new-elo">New Rating: {stats.elo}</span>
-    </div>
-
-    <div class="stats">
-      <h3>Your Statistics</h3>
-      <div class="stat-grid">
-        <div class="stat elo">
-          <span class="label">ELO Rating</span>
-          <span class="value">{stats.elo}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Wins</span>
-          <span class="value">{stats.wins}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Losses</span>
-          <span class="value">{stats.losses}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Draws</span>
-          <span class="value">{stats.draws}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Total Games</span>
-          <span class="value">{calculateTotalGames(stats)}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Win Rate</span>
-          <span class="value">{calculateWinRate(stats)}%</span>
-        </div>
+    <div class="elo-container">
+      <div class="elo-change {eloChange > 0 ? 'positive' : eloChange < 0 ? 'negative' : 'neutral'}">
+        <span class="elo-label">ELO Rating Change:</span>
+        <span class="elo-value">
+          {eloChange > 0 ? '+' : ''}{eloChange}
+        </span>
+      </div>
+      
+      <div class="elo-rating">
+        <span class="elo-label">Current Rating:</span>
+        <span class="elo-current">{stats.elo}</span>
       </div>
     </div>
 
@@ -180,46 +155,81 @@
 
   .message {
     font-size: 1.2rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     color: #424242;
   }
 
-  .stats {
+  .elo-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .elo-change {
     background: #f5f5f5;
     padding: 1.5rem;
     border-radius: 8px;
+    width: 100%;
+    text-align: center;
+    font-size: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 
-  h3 {
+  .elo-change.positive {
+    background: #e8f5e9;
+    border: 2px solid #2e7d32;
+  }
+
+  .elo-change.negative {
+    background: #ffebee;
+    border: 2px solid #c62828;
+  }
+
+  .elo-change.neutral {
+    background: #e3f2fd;
+    border: 2px solid #1565c0;
+  }
+
+  .elo-rating {
+    background: #f5f5f5;
+    padding: 1.5rem;
+    border-radius: 8px;
+    width: 100%;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border: 2px solid #424242;
+  }
+
+  .elo-label {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
     color: #424242;
-    margin: 0 0 1rem 0;
   }
 
-  .stat-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-  }
-
-  .stat {
-    background: white;
-    padding: 1rem;
-    border-radius: 6px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  }
-
-  .label {
-    display: block;
-    color: #757575;
-    font-size: 0.9rem;
+  .elo-value {
+    font-size: 2.5rem;
+    font-weight: bold;
     margin-bottom: 0.5rem;
   }
 
-  .value {
-    display: block;
-    font-size: 1.5rem;
-    font-weight: bold;
+  .elo-value.positive {
     color: #2e7d32;
+  }
+
+  .elo-value.negative {
+    color: #c62828;
+  }
+
+  .elo-current {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #424242;
   }
 
   .button-container {
@@ -272,23 +282,11 @@
 
     .message {
       font-size: 1rem;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
     }
 
-    .stats {
-      padding: 1rem;
-    }
-
-    .stat-grid {
-      gap: 0.5rem;
-    }
-
-    .stat {
-      padding: 0.75rem;
-    }
-
-    .value {
-      font-size: 1.2rem;
+    .elo-value, .elo-current {
+      font-size: 2rem;
     }
 
     .button-container {
@@ -310,71 +308,8 @@
       font-size: 1.3rem;
     }
 
-    .stat-grid {
-      grid-template-columns: 1fr;
+    .elo-value, .elo-current {
+      font-size: 1.8rem;
     }
-  }
-
-  .elo-change {
-    background: #f5f5f5;
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 1.5rem;
-    text-align: center;
-    font-size: 1.2rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .elo-change.positive {
-    background: #e8f5e9;
-    border: 2px solid #2e7d32;
-  }
-
-  .elo-change.negative {
-    background: #ffebee;
-    border: 2px solid #c62828;
-  }
-
-  .elo-change.neutral {
-    background: #e3f2fd;
-    border: 2px solid #1565c0;
-  }
-
-  .elo-label {
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-  }
-
-  .elo-value {
-    font-size: 2rem;
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-  }
-
-  .elo-value.positive {
-    color: #2e7d32;
-  }
-
-  .elo-value.negative {
-    color: #c62828;
-  }
-
-  .new-elo {
-    font-size: 1rem;
-    color: #424242;
-  }
-
-  .stat.elo {
-    grid-column: span 2;
-    background: #e8f5e9;
-    border: 2px solid #2e7d32;
-  }
-
-  .stat.elo .value {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #2e7d32;
   }
 </style> 

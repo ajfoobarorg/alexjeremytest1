@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
@@ -14,19 +14,16 @@ class PlayerResponse(BaseModel):
     draws: int
     elo: int
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Game schemas
 class GameCreate(BaseModel):
     is_public: bool
     player_id: str
-    player_name: str
     game_name: str
 
 class JoinGameRequest(BaseModel):
     player_id: str
-    player_name: str
 
 class PlayerNameUpdate(BaseModel):
     name: str
@@ -55,5 +52,4 @@ class GameResponse(BaseModel):
     player_o: GamePlayerInfo
     game_started: bool
     
-    class Config:
-        orm_mode = True 
+    model_config = ConfigDict(from_attributes=True) 

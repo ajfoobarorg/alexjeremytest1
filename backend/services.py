@@ -77,9 +77,9 @@ class PlayerService:
         return player, elo_change
     
     @staticmethod
-    def update_player_stats(player_id: str, player_name: str, result: str) -> Player:
+    def update_player_stats(player_id: str, result: str) -> Player:
         """Update player stats after a game."""
-        player = PlayerService.get_or_create_player(player_id, player_name)
+        player = PlayerService.get_or_create_player(player_id)
         
         if result == 'win':
             player.wins += 1
@@ -95,7 +95,7 @@ class PlayerService:
     def update_player_name(player_id: str, name: str) -> bool:
         """Update a player's name."""
         try:
-            player = PlayerService.get_or_create_player(player_id, name)
+            PlayerService.get_or_create_player(player_id, name)
             return True
         except Exception as e:
             print(f"Error updating player name: {str(e)}")
@@ -103,10 +103,10 @@ class PlayerService:
 
 class GameService:
     @staticmethod
-    def create_game(player_id: str, player_name: str, game_name: str, is_public: bool) -> Game:
+    def create_game(player_id: str, game_name: str, is_public: bool) -> Game:
         """Create a new game."""
         # Ensure player exists
-        player = PlayerService.get_or_create_player(player_id, player_name)
+        player = PlayerService.get_or_create_player(player_id)
         
         game_id = str(uuid.uuid4())
         game = Game.create(
@@ -116,8 +116,7 @@ class GameService:
             next_board=None,
             created_at=datetime.now(),
             is_public=is_public,
-            player_x=player,
-            player_x_name=player_name
+            player_x=player
         )
         return game
     
@@ -139,7 +138,7 @@ class GameService:
         ))
     
     @staticmethod
-    def join_game(game_id: str, player_id: str, player_name: str) -> Optional[Game]:
+    def join_game(game_id: str, player_id: str) -> Optional[Game]:
         """Join a game as player O."""
         try:
             game = Game.get(Game.id == game_id)
@@ -151,14 +150,13 @@ class GameService:
                 return None
             
             # Ensure player exists
-            player = PlayerService.get_or_create_player(player_id, player_name)
+            player = PlayerService.get_or_create_player(player_id)
             
             # Check if player is trying to play against themselves
             if game.player_x.id == player.id:
                 return None
             
             game.player_o = player
-            game.player_o_name = player_name
             game.save()
             
             return game
@@ -199,23 +197,19 @@ class GameService:
             if game.player_x and game.player_x.id == player_id:
                 game.winner = 'O'
                 winner_id = game.player_o.id if game.player_o else None
-                winner_name = game.player_o_name
                 loser_id = player_id
-                loser_name = game.player_x_name
             else:
                 game.winner = 'X'
                 winner_id = game.player_x.id if game.player_x else None
-                winner_name = game.player_x_name
                 loser_id = player_id
-                loser_name = game.player_o_name
                 
             game.game_over = True
             game.save()
             
             # Update player stats
             if winner_id and loser_id:
-                PlayerService.update_player_stats(winner_id, winner_name, 'win')
-                PlayerService.update_player_stats(loser_id, loser_name, 'loss')
+                PlayerService.update_player_stats(winner_id, 'win')
+                PlayerService.update_player_stats(loser_id, 'loss')
                 
                 # Update ELO ratings
                 winner_player, winner_elo_change = PlayerService.update_player_elo(winner_id, loser_id, 'win')
@@ -256,8 +250,8 @@ class GameService:
                 
                 # Update player stats
                 if game.winner == 'X' and game.player_x and game.player_o:
-                    PlayerService.update_player_stats(game.player_x.id, game.player_x_name, 'win')
-                    PlayerService.update_player_stats(game.player_o.id, game.player_o_name, 'loss')
+                    PlayerService.update_player_stats(game.player_x.id, 'win')
+                    PlayerService.update_player_stats(game.player_o.id, 'loss')
                     
                     # Update ELO ratings
                     player_x, x_elo_change = PlayerService.update_player_elo(game.player_x.id, game.player_o.id, 'win')
@@ -268,8 +262,8 @@ class GameService:
                     game.player_o_elo_change = o_elo_change
                     game.save()
                 elif game.player_x and game.player_o:
-                    PlayerService.update_player_stats(game.player_o.id, game.player_o_name, 'win')
-                    PlayerService.update_player_stats(game.player_x.id, game.player_x_name, 'loss')
+                    PlayerService.update_player_stats(game.player_o.id, 'win')
+                    PlayerService.update_player_stats(game.player_x.id, 'loss')
                     
                     # Update ELO ratings
                     player_o, o_elo_change = PlayerService.update_player_elo(game.player_o.id, game.player_x.id, 'win')
@@ -321,8 +315,8 @@ class GameService:
                 
                 # Update player stats
                 if game.winner == 'X' and game.player_x and game.player_o:
-                    PlayerService.update_player_stats(game.player_x.id, game.player_x_name, 'win')
-                    PlayerService.update_player_stats(game.player_o.id, game.player_o_name, 'loss')
+                    PlayerService.update_player_stats(game.player_x.id, 'win')
+                    PlayerService.update_player_stats(game.player_o.id, 'loss')
                     
                     # Update ELO ratings
                     player_x, x_elo_change = PlayerService.update_player_elo(game.player_x.id, game.player_o.id, 'win')
@@ -333,8 +327,8 @@ class GameService:
                     game.player_o_elo_change = o_elo_change
                     game.save()
                 elif game.player_x and game.player_o:
-                    PlayerService.update_player_stats(game.player_o.id, game.player_o_name, 'win')
-                    PlayerService.update_player_stats(game.player_x.id, game.player_x_name, 'loss')
+                    PlayerService.update_player_stats(game.player_o.id, 'win')
+                    PlayerService.update_player_stats(game.player_x.id, 'loss')
                     
                     # Update ELO ratings
                     player_o, o_elo_change = PlayerService.update_player_elo(game.player_o.id, game.player_x.id, 'win')
@@ -354,8 +348,8 @@ class GameService:
                 
                 # Update player stats for a draw
                 if game.player_x and game.player_o:
-                    PlayerService.update_player_stats(game.player_x.id, game.player_x_name, 'draw')
-                    PlayerService.update_player_stats(game.player_o.id, game.player_o_name, 'draw')
+                    PlayerService.update_player_stats(game.player_x.id, 'draw')
+                    PlayerService.update_player_stats(game.player_o.id, 'draw')
                     
                     # Update ELO ratings for a draw
                     player_x, x_elo_change = PlayerService.update_player_elo(game.player_x.id, game.player_o.id, 'draw')

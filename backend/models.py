@@ -38,10 +38,6 @@ class Game(BaseModel):
     player_x = ForeignKeyField(Player, backref='games_as_x', null=True)
     player_o = ForeignKeyField(Player, backref='games_as_o', null=True)
     
-    # We keep player names in the Game model for convenience
-    player_x_name = CharField(null=True)
-    player_o_name = CharField(null=True)
-    
     # Timing fields
     last_move_time = DateTimeField(default=datetime.datetime.now)
     player_x_time_used = IntegerField(default=0)  # Time used in seconds
@@ -99,14 +95,14 @@ class Game(BaseModel):
             'is_public': self.is_public,
             'player_x': {
                 'id': self.player_x.id if self.player_x else None,
-                'name': self.player_x_name,
+                'name': self.player_x.name if self.player_x else None,
                 'time_remaining': self.get_time_remaining('X'),
                 'elo': player_x_elo,
                 'elo_change': self.player_x_elo_change
             },
             'player_o': {
                 'id': self.player_o.id if self.player_o else None,
-                'name': self.player_o_name,
+                'name': self.player_o.name if self.player_o else None,
                 'time_remaining': self.get_time_remaining('O'),
                 'elo': player_o_elo,
                 'elo_change': self.player_o_elo_change
