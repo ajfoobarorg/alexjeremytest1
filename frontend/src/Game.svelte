@@ -149,7 +149,6 @@
         },
         body: JSON.stringify({
           player_id: $playerId,
-          player_name: player.name
         })
       });
       if (response.ok) {

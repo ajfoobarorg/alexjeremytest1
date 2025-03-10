@@ -38,7 +38,6 @@ def read_root():
 async def create_game(request: GameCreate):
     game = GameService.create_game(
         player_id=request.player_id,
-        player_name=request.player_name,
         game_name=request.game_name,
         is_public=request.is_public
     )
@@ -60,8 +59,7 @@ async def get_game(game_id: str):
 async def join_game(game_id: str, request: JoinGameRequest):
     game = GameService.join_game(
         game_id=game_id,
-        player_id=request.player_id,
-        player_name=request.player_name
+        player_id=request.player_id
     )
     if not game:
         raise HTTPException(status_code=400, detail="Cannot join game")

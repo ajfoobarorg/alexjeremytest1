@@ -56,7 +56,6 @@
         body: JSON.stringify({
           is_public: isPublic,
           player_id: $playerId,
-          player_name: player.name,
           game_name: gameName.trim()
         }),
       });
