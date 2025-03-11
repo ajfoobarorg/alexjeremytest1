@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+import datetime
 
 from config import config
 from models import initialize_db
@@ -116,4 +117,21 @@ async def resign_game(game_id: str, player_id: str):
     game = GameService.resign_game(game_id, player_id)
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
-    return game.to_dict() 
+    return game.to_dict()
+
+@app.post("/games/{game_id}/ready")
+async def ready_game(game_id: str, player_id: str) -> GameResponse:
+    """Signal that player X is ready to start the game"""
+    game = GameService.get_game(game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    
+    # Only player X can signal ready
+    if game.player_x.id != player_id:
+        raise HTTPException(status_code=400, detail="Only player X can signal ready")
+    
+    # Start the game by setting the initial last_move_time
+    game.last_move_time = datetime.datetime.now()
+    game.save()
+    
+    return GameResponse(**game.to_dict()) 
