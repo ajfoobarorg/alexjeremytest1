@@ -52,6 +52,8 @@ class MatchmakingRequest(BaseModel):
     player_id: str
 
 class MatchmakingResponse(BaseModel):
-    status: str  # 'waiting', 'matched', 'error'
-    message: Optional[str] = None
-    game: Optional[GameResponse] = None 
+    """Response for matchmaking operations"""
+    status: str  # "waiting", "waiting_acceptance", "matched", "cancelled", "error"
+    game_id: Optional[str] = None
+    opponent_name: Optional[str] = None
+    message: Optional[str] = None 

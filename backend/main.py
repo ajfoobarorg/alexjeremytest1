@@ -5,7 +5,8 @@ import logging
 from config import config
 from models import initialize_db
 from schemas import (
-    PlayerNameUpdate, PlayerResponse, MatchmakingRequest, MatchmakingResponse
+    PlayerNameUpdate, PlayerResponse, MatchmakingRequest, MatchmakingResponse,
+    GameResponse
 )
 from services import GameService, PlayerService
 from matchmaking import MatchmakingService
@@ -59,42 +60,46 @@ async def update_player_name(player_id: str, request: PlayerNameUpdate):
 # Matchmaking endpoints
 @app.post("/matchmaking/join")
 async def join_matchmaking(request: MatchmakingRequest) -> MatchmakingResponse:
-    success = MatchmakingService.add_player(request.player_id)
-    if not success:
+    """Join the matchmaking queue"""
+    if not MatchmakingService.add_player(request.player_id):
         raise HTTPException(status_code=400, detail="Could not add player to matchmaking")
     return MatchmakingResponse(status="waiting")
 
 @app.post("/matchmaking/ping")
 async def ping_matchmaking(request: MatchmakingRequest) -> MatchmakingResponse:
-    game, error = MatchmakingService.find_match(request.player_id)
+    """Ping to check matchmaking status and keep player in queue"""
+    # Update player's presence
+    MatchmakingService.update_ping(request.player_id)
+    
+    # Check for match
+    game, error, opponent_name, match_accepted = MatchmakingService.find_match(request.player_id)
     
     if error:
-        return MatchmakingResponse(
-            status="error",
-            message=error
-        )
+        raise HTTPException(status_code=400, detail=error)
     
     if game:
+        # Both players have accepted, return game ID
         return MatchmakingResponse(
             status="matched",
-            game=GameResponse.model_validate(game)
+            game_id=game.id,
+            opponent_name=opponent_name
         )
-    
-    # Update ping time
-    if not MatchmakingService.update_ping(request.player_id):
+    elif opponent_name:
+        # Match found but waiting for acceptance
         return MatchmakingResponse(
-            status="error",
-            message="Player not in waiting list"
+            status="waiting_acceptance",
+            opponent_name=opponent_name
         )
-    
-    return MatchmakingResponse(status="waiting")
+    else:
+        # Still waiting for match
+        return MatchmakingResponse(status="waiting")
 
 @app.post("/matchmaking/cancel")
 async def cancel_matchmaking(request: MatchmakingRequest) -> MatchmakingResponse:
-    success = MatchmakingService.remove_player(request.player_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Player not in matchmaking")
-    return MatchmakingResponse(status="cancelled")
+    """Cancel matchmaking for a player"""
+    if MatchmakingService.remove_player(request.player_id):
+        return MatchmakingResponse(status="cancelled")
+    raise HTTPException(status_code=400, detail="Player not in matchmaking")
 
 # Game action endpoints
 @app.post("/games/{game_id}/move/{board_index}/{position}")

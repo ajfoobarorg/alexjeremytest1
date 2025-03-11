@@ -2,37 +2,29 @@
   import { onMount, onDestroy } from 'svelte';
   import { playerId } from './stores.js';
   import { navigate } from './router.js';
-  import PlayerNameModal from './PlayerNameModal.svelte';
   import GameEndModal from './GameEndModal.svelte';
   import { API_BASE_URL } from './config.js';
   import StartGameModal from './StartGameModal.svelte';
-  import { calculateTotalGames, calculateWinRate } from './utils.js';
-
+  
   export let gameId;
 
   // Game state - single source of truth
   let game = null;
   
   // UI state
-  let showCopiedMessage = false;
-  let hasTriedToJoin = false;
   let showGameEndModal = false;
   let gameEndModalDismissed = false;
-  let showStartGameModal = false;
-  let startGameModalShown = false; // Track if start game modal has been shown
+  let showStartGameModal = true;  // Start true since we always show it at game start
   let isLoading = true;
   let showResignConfirm = false;
   
   // Player information
   let player = null; // Current player data including name and stats
   let playerSymbol = null;
-  let isPlayer = false;
   let opponent = null; // Opponent data including name and stats
 
   // Timing variables
   let lastUpdateTime = null;
-  let serverPlayerXTimeRemaining = null;
-  let serverPlayerOTimeRemaining = null;
   let displayedXTimeRemaining = null;
   let displayedOTimeRemaining = null;
   let warningCountdown = null;
@@ -58,9 +50,15 @@
       const response = await fetch(`${API_BASE_URL}/players/${$playerId}`);
       if (response.ok) {
         player = await response.json();
+      } else {
+        // If we can't fetch player data, redirect to home
+        navigate('/');
+        return;
       }
     } catch (error) {
       console.error('Error fetching player data:', error);
+      navigate('/');
+      return;
     } finally {
       isLoading = false;
     }
@@ -68,10 +66,6 @@
 
   $: if ($playerId) {
     fetchPlayerData();
-  }
-
-  $: if (player?.name) {
-    hasTriedToJoin = false;
   }
 
   // Function to handle game end
@@ -91,7 +85,7 @@
     }
   }
 
-  $: if (game?.game_over && !showGameEndModal && !gameEndModalDismissed && isPlayer && !handlingGameEnd) {
+  $: if (game?.game_over && !showGameEndModal && !gameEndModalDismissed && isMyTurn && !handlingGameEnd) {
     handleGameEnd();
   }
 
@@ -105,11 +99,9 @@
     if (elapsed > 0) {
       // Only decrement time for the current player
       if (game.current_player === 'X') {
-        displayedXTimeRemaining = Math.max(0, serverPlayerXTimeRemaining - elapsed);
-        displayedOTimeRemaining = serverPlayerOTimeRemaining;
+        displayedXTimeRemaining = Math.max(0, displayedXTimeRemaining - elapsed);
       } else {
-        displayedOTimeRemaining = Math.max(0, serverPlayerOTimeRemaining - elapsed);
-        displayedXTimeRemaining = serverPlayerXTimeRemaining;
+        displayedOTimeRemaining = Math.max(0, displayedOTimeRemaining - elapsed);
       }
       
       // Check for warning conditions based on inactivity
@@ -120,102 +112,67 @@
   }
 
   function updateTimesFromServer(xTime, oTime) {
-    // Don't start timing until both players have joined and countdown is complete
-    if (!game?.game_started || !playerO) return;
-
-    // Initialize the timer if this is the first update
-    if (lastUpdateTime === null) {
-      timeUpdateInterval = setInterval(updateDisplayTimes, 1000);  // Update every second instead of 100ms
+    // Initialize the timer if this is the first update or if it was cleared
+    if (!timeUpdateInterval) {
+      timeUpdateInterval = setInterval(updateDisplayTimes, 1000);  // Update every second
     }
     
-    // Only update the times if they've changed from the server
-    if (xTime !== serverPlayerXTimeRemaining || oTime !== serverPlayerOTimeRemaining) {
-      serverPlayerXTimeRemaining = xTime;
-      serverPlayerOTimeRemaining = oTime;
-      displayedXTimeRemaining = xTime;
-      displayedOTimeRemaining = oTime;
-      lastUpdateTime = Date.now();
-    }
-  }
-
-  async function tryJoinGame() {
-    if (!player?.name) return false;
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/games/${gameId}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          player_id: $playerId,
-        })
-      });
-      if (response.ok) {
-        return true;
-      }
-    } catch (error) {
-      console.error('Error joining game:', error);
-    }
-    return false;
+    // Update the displayed times and reset the last update time
+    displayedXTimeRemaining = xTime;
+    displayedOTimeRemaining = oTime;
+    lastUpdateTime = Date.now();
   }
 
   async function fetchGameState() {
     try {
       const response = await fetch(`${API_BASE_URL}/games/${gameId}`);
+      if (!response.ok) {
+        // If game doesn't exist, redirect to home
+        navigate('/');
+        return;
+      }
       const data = await response.json();
-      
-      // Store previous state to detect changes
-      const hadPlayerO = playerO !== null;
       
       // Store full game data
       game = data;
       
-      // Determine if we need to fetch opponent data
-      const needToFetchOpponent = (!opponent && (playerX || playerO)) || (!hadPlayerO && game.player_o.id) || game.game_over;
-      
-      // Fetch opponent stats when needed
-      if (needToFetchOpponent) {
-        updatePollingInterval();
-        const opponentId = $playerId === playerX ? playerO : playerX;
-        if (opponentId) {
+      // Fetch opponent data on first load
+      if (!opponent) {
+        // Determine player symbol and opponent ID
+        if (data.player_x.id === $playerId) {
+          playerSymbol = "X";
+          const opponentId = data.player_o.id;
           try {
             const response = await fetch(`${API_BASE_URL}/players/${opponentId}`);
             opponent = await response.json();
           } catch (error) {
             console.error('Error fetching opponent data:', error);
+            navigate('/');
+            return;
           }
-        }
-      }
-      
-      // Check if second player just joined
-      if (game.player_o.id && !game.game_started && !showStartGameModal && !startGameModalShown) {
-        showStartGameModal = true;
-        startGameModalShown = true; // Mark that we've shown the modal
-      }
-      
-      // Update server times
-      updateTimesFromServer(data.player_x.time_remaining, data.player_o.time_remaining);
-      
-      isPlayer = false;
-      playerSymbol = null;
-
-      if (data.player_x.id === $playerId) {
-        isPlayer = true;
-        playerSymbol = "X";
-      } else if (data.player_o.id === $playerId) {
-        isPlayer = true;
-        playerSymbol = "O";
-      } else if (!hasTriedToJoin && !data.player_o.id && !data.game_over && player?.name) {
-        hasTriedToJoin = true;
-        const joined = await tryJoinGame();
-        if (joined) {
-          await fetchGameState();
+        } else if (data.player_o.id === $playerId) {
+          playerSymbol = "O";
+          const opponentId = data.player_x.id;
+          try {
+            const response = await fetch(`${API_BASE_URL}/players/${opponentId}`);
+            opponent = await response.json();
+          } catch (error) {
+            console.error('Error fetching opponent data:', error);
+            navigate('/');
+            return;
+          }
+        } else {
+          // If not a player, redirect to home
+          navigate('/');
           return;
         }
       }
+      
+      // Update times
+      updateTimesFromServer(data.player_x.time_remaining, data.player_o.time_remaining);
     } catch (error) {
       console.error('Error fetching game state:', error);
+      navigate('/');
     }
   }
 
@@ -239,8 +196,8 @@
       // Update server times
       updateTimesFromServer(data.player_x.time_remaining, data.player_o.time_remaining);
 
-      if (data.game_over && isPlayer && !gameEndModalDismissed) {
-        // Game just ended and we're a player - handle game end
+      if (data.game_over && !gameEndModalDismissed) {
+        // Game just ended - handle game end
         clearInterval(pollInterval);
         clearInterval(timeUpdateInterval);
         clearInterval(warningInterval);
@@ -271,20 +228,16 @@
     return classes.join(' ');
   }
 
-  function copyGameUrl() {
-    navigator.clipboard.writeText(gameUrl);
-    showCopiedMessage = true;
-    setTimeout(() => {
-      showCopiedMessage = false;
-    }, 2000);
-  }
-
   onMount(async () => {
+    if (!$playerId) {
+      navigate('/');
+      return;
+    }
     await fetchPlayerData();
     await fetchGameState();
     
-    // Start with slower polling while waiting for opponent
-    pollInterval = setInterval(fetchGameState, 3000);
+    // Poll every second since this is an active game
+    pollInterval = setInterval(fetchGameState, 1000);
   });
 
   onDestroy(() => {
@@ -327,8 +280,8 @@
         const data = await response.json();
         game = data; // Update game state directly
         
-        if (data.game_over && isPlayer && !gameEndModalDismissed) {
-          // Game just ended and we're a player - handle game end
+        if (data.game_over && isMyTurn && !gameEndModalDismissed) {
+          // Game just ended - handle game end
           clearInterval(pollInterval);
           clearInterval(timeUpdateInterval);
           clearInterval(warningInterval);
@@ -347,24 +300,22 @@
   }
 
   async function handleGameStart() {
+    showStartGameModal = false;
+    
+    // Only player X needs to signal they're ready to start
     if (playerSymbol === 'X') {
-      // Only player X sends the start game API call
       try {
-        const response = await fetch(`${API_BASE_URL}/games/${gameId}/start?player_id=${$playerId}`, {
+        const response = await fetch(`${API_BASE_URL}/games/${gameId}/ready?player_id=${$playerId}`, {
           method: 'POST'
         });
         
         if (response.ok) {
           const data = await response.json();
-          showStartGameModal = false;
           game = data; // Update game state directly
         }
       } catch (error) {
         console.error('Error starting game:', error);
       }
-    } else {
-      // Player O just updates their local state
-      showStartGameModal = false;
     }
   }
 
@@ -373,57 +324,33 @@
     gameEndModalDismissed = true;
     eloChange = null; // Reset the stored ELO change
   }
-
-  // Add this function to update polling frequency
-  function updatePollingInterval() {
-    // Clear existing interval
-    if (pollInterval) {
-      clearInterval(pollInterval);
-    }
-    
-    // Poll every second during active games, every 3 seconds while waiting
-    const interval = (playerO && !game?.game_over) ? 1000 : 3000;
-    pollInterval = setInterval(fetchGameState, interval);
-  }
 </script>
 
 {#if isLoading}
   <div class="loading">Loading...</div>
-{:else if !player?.name}
-  <PlayerNameModal />
 {:else if game}
 <main>
   <div class="game-info">
-    {#if !game.game_started && !game.game_over}
-      <!-- Before game starts -->
-      <button class="share" on:click={copyGameUrl}>
-        {showCopiedMessage ? 'URL Copied!' : 'Share Game URL'}
-      </button>
-      <button class="home" on:click={() => navigate('/')}>Cancel</button>
-    {:else if game.game_started && !game.game_over}
-      <!-- During active game -->
-      {#if isPlayer}
-        <div class="resign-container">
-          {#if showResignConfirm}
-            <div class="resign-confirm">
-              <span>Resign game?</span>
-              <div class="resign-buttons">
-                <button class="confirm" on:click={() => {
-                  resignGame();
-                  showResignConfirm = false;
-                }}>Yes</button>
-                <button class="cancel" on:click={() => showResignConfirm = false}>No</button>
-              </div>
-            </div>
-          {:else}
-            <button class="resign" on:click={() => showResignConfirm = true}>Resign Game</button>
-          {/if}
-        </div>
-      {/if}
-    {:else if game.game_over}
-      <!-- After game ends -->
+    {#if game.game_over}
       <button class="home" on:click={() => navigate('/')}>Back to Home</button>
       <button class="analyze" disabled>Analyze Moves</button>
+    {:else}
+      <div class="resign-container">
+        {#if showResignConfirm}
+          <div class="resign-confirm">
+            <span>Resign game?</span>
+            <div class="resign-buttons">
+              <button class="confirm" on:click={() => {
+                resignGame();
+                showResignConfirm = false;
+              }}>Yes</button>
+              <button class="cancel" on:click={() => showResignConfirm = false}>No</button>
+            </div>
+          </div>
+        {:else}
+          <button class="resign" on:click={() => showResignConfirm = true}>Resign Game</button>
+        {/if}
+      </div>
     {/if}
   </div>
 
@@ -482,14 +409,6 @@
         Winner: {game.winner === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}!
       {:else if game.game_over}
         Game Over - Draw!
-      {:else if !isPlayer}
-        {#if game.current_player === "X" && !playerO}
-          Waiting for player O to join...
-        {:else}
-          Spectating - {game.current_player === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}'s turn
-        {/if}
-      {:else if !playerO}
-        Waiting for another player to join...
       {:else if game.current_player === playerSymbol}
         Your turn ({playerSymbol})
         {#if game.next_board !== null}
@@ -514,7 +433,7 @@
               <button 
                 class="cell {cell.toLowerCase()}" 
                 on:click={() => makeMove(boardIndex, position)}
-                disabled={!isPlayer || game.current_player !== playerSymbol || cell || !isBoardPlayable(boardIndex)}
+                disabled={!isMyTurn || game.current_player !== playerSymbol || cell || !isBoardPlayable(boardIndex)}
               >
                 {cell}
               </button>
@@ -535,10 +454,10 @@
 
   {#if showStartGameModal}
     <StartGameModal
-      playerXName={playerX ? (playerSymbol === 'X' ? player.name : opponent?.name) : 'Unknown'}
-      playerOName={playerO ? (playerSymbol === 'O' ? player.name : opponent?.name) : 'Unknown'}
-      playerXStats={$playerId === playerX ? player : opponent}
-      playerOStats={$playerId === playerO ? player : opponent}
+      playerXName={game.player_x.name}
+      playerOName={game.player_o.name}
+      playerXStats={game.player_x}
+      playerOStats={game.player_o}
       on:start={handleGameStart}
     />
   {/if}

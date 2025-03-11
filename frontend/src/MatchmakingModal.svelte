@@ -9,9 +9,14 @@
   let status = 'Searching for opponent...';
   let error = null;
   let intervalId;
+  let searchStartTime;
+  let opponentName = null;
+  let showCancelButton = true;
+  const TIMEOUT_MS = 30000; // 30 seconds timeout
 
   async function startMatchmaking() {
     try {
+      searchStartTime = Date.now();
       const response = await fetch(`${API_BASE_URL}/matchmaking/join`, {
         method: 'POST',
         headers: {
@@ -38,6 +43,13 @@
 
   async function checkMatchStatus() {
     try {
+      // Check if we've exceeded the timeout
+      if (Date.now() - searchStartTime >= TIMEOUT_MS) {
+        error = 'No match found. Please try again.';
+        await cancelMatchmaking();
+        return;
+      }
+
       const response = await fetch(`${API_BASE_URL}/matchmaking/ping`, {
         method: 'POST',
         headers: {
@@ -57,11 +69,18 @@
       const data = await response.json();
       
       if (data.status === 'matched') {
-        // Game found, navigate to the game
+        // Game found and both players have accepted, navigate to the game
         clearInterval(intervalId);
+        intervalId = null;
         navigate(`/game/${data.game_id}`);
+      } else if (data.status === 'waiting_acceptance') {
+        // Match found but waiting for both players to accept
+        opponentName = data.opponent_name;
+        showCancelButton = false;
+        status = `Starting game with ${data.opponent_name}...`;
       } else if (data.status === 'waiting') {
-        status = 'Searching for opponent...';
+        const timeElapsed = Math.floor((Date.now() - searchStartTime) / 1000);
+        status = `Searching for opponent... (${30 - timeElapsed}s)`;
       }
     } catch (err) {
       error = 'Failed to check match status';
@@ -70,6 +89,11 @@
   }
 
   async function cancelMatchmaking() {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+
     try {
       await fetch(`${API_BASE_URL}/matchmaking/cancel`, {
         method: 'POST',
@@ -84,7 +108,6 @@
       console.error('Error canceling matchmaking:', err);
     }
     
-    clearInterval(intervalId);
     onClose();
   }
 
@@ -95,6 +118,7 @@
   onDestroy(() => {
     if (intervalId) {
       clearInterval(intervalId);
+      intervalId = null;
       cancelMatchmaking();
     }
   });
@@ -110,7 +134,9 @@
     {:else}
       <div class="loading-spinner"></div>
       <p class="status">{status}</p>
-      <button class="cancel-button" on:click={cancelMatchmaking}>Cancel</button>
+      {#if showCancelButton}
+        <button class="cancel-button" on:click={cancelMatchmaking}>Cancel</button>
+      {/if}
     {/if}
   </div>
 </div>
@@ -137,6 +163,36 @@
     text-align: center;
     max-width: 400px;
     width: 90%;
+    margin: 0 1rem;
+    box-sizing: border-box;
+  }
+
+  @media (max-width: 480px) {
+    .modal {
+      padding: 1.5rem;
+      width: 95%;
+      margin: 0 0.5rem;
+    }
+
+    h2 {
+      font-size: 1.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .status {
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 0.7rem 1.2rem;
+      font-size: 0.95rem;
+    }
+
+    .loading-spinner {
+      width: 32px;
+      height: 32px;
+      border-width: 3px;
+    }
   }
 
   h2 {
