@@ -5,9 +5,10 @@ import logging
 from config import config
 from models import initialize_db
 from schemas import (
-    GameCreate, JoinGameRequest, PlayerNameUpdate, PlayerResponse
+    PlayerNameUpdate, PlayerResponse, MatchmakingRequest, MatchmakingResponse
 )
 from services import GameService, PlayerService
+from matchmaking import MatchmakingService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,20 +35,6 @@ initialize_db()
 def read_root():
     return {"message": "Ultimate Tic-Tac-Toe API"}
 
-@app.post("/games/new")
-async def create_game(request: GameCreate):
-    game = GameService.create_game(
-        player_id=request.player_id,
-        game_name=request.game_name,
-        is_public=request.is_public
-    )
-    return game.to_dict()
-
-@app.get("/games/public")
-async def get_public_games():
-    games = GameService.get_public_games()
-    return [game.to_dict() for game in games]
-
 @app.get("/games/{game_id}")
 async def get_game(game_id: str):
     game = GameService.get_game(game_id)
@@ -55,23 +42,61 @@ async def get_game(game_id: str):
         raise HTTPException(status_code=404, detail="Game not found")
     return game.to_dict()
 
-@app.post("/games/{game_id}/join")
-async def join_game(game_id: str, request: JoinGameRequest):
-    game = GameService.join_game(
-        game_id=game_id,
-        player_id=request.player_id
-    )
-    if not game:
-        raise HTTPException(status_code=400, detail="Cannot join game")
-    return game.to_dict()
+@app.get("/players/{player_id}")
+async def get_player(player_id: str):
+    player = PlayerService.get_player(player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return PlayerResponse.model_validate(player)
 
-@app.post("/games/{game_id}/resign")
-async def resign_game(game_id: str, player_id: str):
-    game = GameService.resign_game(game_id, player_id)
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found or you are not a player")
-    return game.to_dict()
+@app.post("/players/{player_id}/name")
+async def update_player_name(player_id: str, request: PlayerNameUpdate):
+    success = PlayerService.update_player_name(player_id, request.name)
+    if not success:
+        raise HTTPException(status_code=400, detail="Could not update player name")
+    return {"success": True}
 
+# Matchmaking endpoints
+@app.post("/matchmaking/join")
+async def join_matchmaking(request: MatchmakingRequest) -> MatchmakingResponse:
+    success = MatchmakingService.add_player(request.player_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Could not add player to matchmaking")
+    return MatchmakingResponse(status="waiting")
+
+@app.post("/matchmaking/ping")
+async def ping_matchmaking(request: MatchmakingRequest) -> MatchmakingResponse:
+    game, error = MatchmakingService.find_match(request.player_id)
+    
+    if error:
+        return MatchmakingResponse(
+            status="error",
+            message=error
+        )
+    
+    if game:
+        return MatchmakingResponse(
+            status="matched",
+            game=GameResponse.model_validate(game)
+        )
+    
+    # Update ping time
+    if not MatchmakingService.update_ping(request.player_id):
+        return MatchmakingResponse(
+            status="error",
+            message="Player not in waiting list"
+        )
+    
+    return MatchmakingResponse(status="waiting")
+
+@app.post("/matchmaking/cancel")
+async def cancel_matchmaking(request: MatchmakingRequest) -> MatchmakingResponse:
+    success = MatchmakingService.remove_player(request.player_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Player not in matchmaking")
+    return MatchmakingResponse(status="cancelled")
+
+# Game action endpoints
 @app.post("/games/{game_id}/move/{board_index}/{position}")
 async def make_move(game_id: str, board_index: int, position: int, player_id: str):
     game, error = GameService.make_move(game_id, board_index, position, player_id)
@@ -81,29 +106,9 @@ async def make_move(game_id: str, board_index: int, position: int, player_id: st
         raise HTTPException(status_code=404, detail="Game not found")
     return game.to_dict()
 
-@app.post("/games/{game_id}/start")
-async def start_game(game_id: str, player_id: str):
-    game = GameService.start_game(game_id, player_id)
+@app.post("/games/{game_id}/resign")
+async def resign_game(game_id: str, player_id: str):
+    game = GameService.resign_game(game_id, player_id)
     if not game:
-        raise HTTPException(status_code=400, detail="Cannot start game")
-    return game.to_dict()
-
-@app.get("/players/{player_id}", response_model=PlayerResponse)
-async def get_player(player_id: str):
-    """Get player information including name and stats."""
-    try:
-        player = PlayerService.get_or_create_player(player_id, None)
-        if not player:
-            logger.error(f"Player not found with ID: {player_id}")
-            raise HTTPException(status_code=404, detail=f"Player not found with ID: {player_id}")
-        # Return the player directly and let FastAPI handle the conversion
-        return player
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Player not found: {str(e)}")
-
-@app.post("/players/{player_id}/name")
-async def update_player_name(player_id: str, request: PlayerNameUpdate):
-    success = PlayerService.update_player_name(player_id, request.name)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to update player name")
-    return {"success": True} 
+        raise HTTPException(status_code=404, detail="Game not found")
+    return game.to_dict() 

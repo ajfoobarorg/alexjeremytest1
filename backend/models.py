@@ -31,8 +31,6 @@ class Game(BaseModel):
     winner = CharField(null=True)
     game_over = BooleanField(default=False)
     created_at = DateTimeField(default=datetime.datetime.now)
-    is_public = BooleanField(default=False)
-    game_started = BooleanField(default=False)
     
     # Player references with foreign keys
     player_x = ForeignKeyField(Player, backref='games_as_x', null=True)
@@ -54,17 +52,11 @@ class Game(BaseModel):
     
     def get_time_remaining(self, player):
         """Get remaining time for a player in seconds."""
-        if not self.game_started:
-            return self.TOTAL_TIME_ALLOWED
-            
         time_used = self.player_x_time_used if player == 'X' else self.player_o_time_used
         return max(0, self.TOTAL_TIME_ALLOWED - time_used)
     
     def update_time_used(self):
         """Update time used by current player based on last move time."""
-        if not self.game_started:
-            return self.TOTAL_TIME_ALLOWED
-            
         now = datetime.datetime.now()
         elapsed = int((now - self.last_move_time).total_seconds())
         
@@ -76,7 +68,6 @@ class Game(BaseModel):
         self.last_move_time = now
         return self.get_time_remaining(self.current_player)
     
-    # Since we have special logic here for the boards, we must override the default to_dict method
     def to_dict(self):
         """Convert model to dictionary for API response."""
         # Get player ELO ratings if available
@@ -92,7 +83,6 @@ class Game(BaseModel):
             'next_board': self.next_board,
             'winner': self.winner,
             'game_over': self.game_over,
-            'is_public': self.is_public,
             'player_x': {
                 'id': self.player_x.id if self.player_x else None,
                 'name': self.player_x.name if self.player_x else None,
@@ -106,8 +96,7 @@ class Game(BaseModel):
                 'time_remaining': self.get_time_remaining('O'),
                 'elo': player_o_elo,
                 'elo_change': self.player_o_elo_change
-            },
-            'game_started': self.game_started
+            }
         }
 
 def initialize_db():
