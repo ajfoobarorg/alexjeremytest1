@@ -30,6 +30,7 @@
   let warningInterval;
   let pollInterval;
   let timeUpdateInterval;
+  let lastPlayer = null;  // Track the last player to detect changes
 
   // Track if we're currently handling a game end
   let handlingGameEnd = false;
@@ -103,9 +104,12 @@
   }
 
   function updateTimesFromServer(xTime, oTime) {
-    // Update the displayed times
-    displayedXTimeRemaining = xTime;
-    displayedOTimeRemaining = oTime;
+    // Only update times if the current player has changed
+    if (game?.current_player !== lastPlayer) {
+      displayedXTimeRemaining = xTime;
+      displayedOTimeRemaining = oTime;
+      lastPlayer = game?.current_player;
+    }
   }
 
   async function fetchGameState() {
