@@ -1,3 +1,4 @@
+import logging
 import json
 from typing import List, Optional, Union
 
@@ -31,6 +32,11 @@ class Board:
     
     def check_winner(self) -> Optional[str]:
         """Check if there's a winner."""
+        return Board.check_winner_from_list(self._squares)
+    
+    @staticmethod
+    def check_winner_from_list(board_as_list: List[str]) -> Optional[str]:
+        """Check if there's a winner from a list representation of a board."""
         lines = [
             [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
             [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
@@ -38,9 +44,9 @@ class Board:
         ]
         
         for line in lines:
-            if (self._squares[line[0]] and 
-                self._squares[line[0]] == self._squares[line[1]] == self._squares[line[2]]):
-                return self._squares[line[0]]
+            if (board_as_list[line[0]] and board_as_list[line[0]] != "T" and
+                board_as_list[line[0]] == board_as_list[line[1]] == board_as_list[line[2]]):
+                return board_as_list[line[0]]
         return None
 
 class GameLogic:
@@ -60,27 +66,21 @@ class GameLogic:
     @staticmethod
     def is_board_playable(meta_board: Union[str, List[str]], board_index: int, board: Board) -> bool:
         """Check if a board can be played in."""
+        # I believe meta_board list is just a list of nine strings, representing who was
+        # the winner of each board, or blank if no one has won on that board yet.
         meta_board_list = json.loads(meta_board) if isinstance(meta_board, str) else meta_board
         return meta_board_list[board_index] == "" and not board.is_full()
     
     @staticmethod
     def check_winner(board: Union[List[str], Board]) -> Optional[str]:
         """Check if there's a winner in a board or meta-board."""
+        #TODO(aroetter): I don't think the meta-board comment above is correct.
         if isinstance(board, Board):
+            logging.fatal("TODO(aroetteR): CHECK TO SEE THIS NEVER HAPPENS. Consider deleting")
             return board.check_winner()
             
         # Handle list representation
-        lines = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
-            [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
-            [0, 4, 8], [2, 4, 6]  # Diagonals
-        ]
-        
-        for line in lines:
-            if (board[line[0]] and board[line[0]] != "T" and
-                board[line[0]] == board[line[1]] == board[line[2]]):
-                return board[line[0]]
-        return None
+        return Board.check_winner_from_list(board)
     
     @staticmethod
     def is_board_full(board: Union[List[str], Board]) -> bool:
