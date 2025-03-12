@@ -9,6 +9,14 @@ from board_logic import GameLogic
 
 class PlayerService:
     @staticmethod
+    def get_player(player_id: str) -> Optional[Player]:
+        """Get a player by ID."""
+        try:
+            return Player.get(Player.id == player_id)
+        except Player.DoesNotExist:
+            return None
+    
+    @staticmethod
     def get_or_create_player(player_id: str, player_name: Optional[str] = None) -> Player:
         """Get an existing player or create a new one."""
         try:
@@ -103,83 +111,10 @@ class PlayerService:
 
 class GameService:
     @staticmethod
-    def create_game(player_id: str, game_name: str, is_public: bool) -> Game:
-        """Create a new game."""
-        # Ensure player exists
-        player = PlayerService.get_or_create_player(player_id)
-        
-        game_id = str(uuid.uuid4())
-        game = Game.create(
-            id=game_id,
-            name=game_name,
-            current_player="X",
-            next_board=None,
-            created_at=datetime.now(),
-            is_public=is_public,
-            player_x=player
-        )
-        return game
-    
-    @staticmethod
     def get_game(game_id: str) -> Optional[Game]:
         """Get a game by ID."""
         try:
             return Game.get(Game.id == game_id)
-        except Game.DoesNotExist:
-            return None
-    
-    @staticmethod
-    def get_public_games() -> List[Game]:
-        """Get all public games that are not full."""
-        return list(Game.select().where(
-            (Game.is_public == True) & 
-            (Game.player_o.is_null()) & 
-            (Game.game_over == False)
-        ))
-    
-    @staticmethod
-    def join_game(game_id: str, player_id: str) -> Optional[Game]:
-        """Join a game as player O."""
-        try:
-            game = Game.get(Game.id == game_id)
-            
-            if game.game_over:
-                return None
-            
-            if game.player_o:
-                return None
-            
-            # Ensure player exists
-            player = PlayerService.get_or_create_player(player_id)
-            
-            # Check if player is trying to play against themselves
-            if game.player_x.id == player.id:
-                return None
-            
-            game.player_o = player
-            game.save()
-            
-            return game
-        except Game.DoesNotExist:
-            return None
-    
-    @staticmethod
-    def start_game(game_id: str, player_id: str) -> Optional[Game]:
-        """Start a game (player X only)."""
-        try:
-            game = Game.get(Game.id == game_id)
-            
-            if game.player_x.id != player_id:
-                return None
-                
-            if not game.player_o:
-                return None
-                
-            game.game_started = True
-            game.last_move_time = datetime.now()
-            game.save()
-            
-            return game
         except Game.DoesNotExist:
             return None
     

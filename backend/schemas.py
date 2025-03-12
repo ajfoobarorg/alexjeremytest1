@@ -17,11 +17,6 @@ class PlayerResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 # Game schemas
-class GameCreate(BaseModel):
-    is_public: bool
-    player_id: str
-    game_name: str
-
 class JoinGameRequest(BaseModel):
     player_id: str
 
@@ -47,9 +42,18 @@ class GameResponse(BaseModel):
     next_board: Optional[int]
     winner: Optional[str]
     game_over: bool
-    is_public: bool
     player_x: GamePlayerInfo
     player_o: GamePlayerInfo
-    game_started: bool
     
-    model_config = ConfigDict(from_attributes=True) 
+    model_config = ConfigDict(from_attributes=True)
+
+# Matchmaking schemas
+class MatchmakingRequest(BaseModel):
+    player_id: str
+
+class MatchmakingResponse(BaseModel):
+    """Response for matchmaking operations"""
+    status: str  # "waiting", "waiting_acceptance", "matched", "cancelled", "error"
+    game_id: Optional[str] = None
+    opponent_name: Optional[str] = None
+    message: Optional[str] = None 

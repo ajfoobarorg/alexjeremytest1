@@ -2,43 +2,35 @@
   import { onMount, onDestroy } from 'svelte';
   import { playerId } from './stores.js';
   import { navigate } from './router.js';
-  import PlayerNameModal from './PlayerNameModal.svelte';
   import GameEndModal from './GameEndModal.svelte';
   import { API_BASE_URL } from './config.js';
   import StartGameModal from './StartGameModal.svelte';
-  import { calculateTotalGames, calculateWinRate } from './utils.js';
-
+  import { calculateWinRate } from './utils.js';
+  
   export let gameId;
 
   // Game state - single source of truth
   let game = null;
   
   // UI state
-  let showCopiedMessage = false;
-  let hasTriedToJoin = false;
   let showGameEndModal = false;
   let gameEndModalDismissed = false;
-  let showStartGameModal = false;
-  let startGameModalShown = false; // Track if start game modal has been shown
+  let showStartGameModal = true;  // Start true since we always show it at game start
   let isLoading = true;
   let showResignConfirm = false;
   
   // Player information
-  let player = null; // Current player data including name and stats
   let playerSymbol = null;
-  let isPlayer = false;
-  let opponent = null; // Opponent data including name and stats
+  let player = null;  // Only used for post-game ELO updates
 
   // Timing variables
-  let lastUpdateTime = null;
-  let serverPlayerXTimeRemaining = null;
-  let serverPlayerOTimeRemaining = null;
   let displayedXTimeRemaining = null;
   let displayedOTimeRemaining = null;
   let warningCountdown = null;
   let warningInterval;
   let pollInterval;
   let timeUpdateInterval;
+  let lastPlayer = null;  // Track the last player to detect changes
 
   // Track if we're currently handling a game end
   let handlingGameEnd = false;
@@ -52,26 +44,23 @@
   $: isMyTurn = game?.current_player === 'X' ? playerX === $playerId : playerO === $playerId;
   $: timeRemaining = game?.current_player === 'X' ? displayedXTimeRemaining : displayedOTimeRemaining;
   $: showWarning = isMyTurn && (warningCountdown !== null || (timeRemaining !== null && timeRemaining <= 25)) && !game?.game_over;
+  $: gameStarted = !showStartGameModal;  // Game has started when start modal is dismissed
 
   async function fetchPlayerData() {
     try {
       const response = await fetch(`${API_BASE_URL}/players/${$playerId}`);
       if (response.ok) {
         player = await response.json();
+      } else {
+        // If we can't fetch player data, redirect to home
+        navigate('/');
+        return;
       }
     } catch (error) {
       console.error('Error fetching player data:', error);
-    } finally {
-      isLoading = false;
+      navigate('/');
+      return;
     }
-  }
-
-  $: if ($playerId) {
-    fetchPlayerData();
-  }
-
-  $: if (player?.name) {
-    hasTriedToJoin = false;
   }
 
   // Function to handle game end
@@ -91,131 +80,69 @@
     }
   }
 
-  $: if (game?.game_over && !showGameEndModal && !gameEndModalDismissed && isPlayer && !handlingGameEnd) {
+  $: if (game?.game_over && !showGameEndModal && !gameEndModalDismissed && isMyTurn && !handlingGameEnd) {
     handleGameEnd();
   }
 
   function updateDisplayTimes() {
-    if (game?.game_over || lastUpdateTime === null) return;
+    if (game?.game_over) return;
     
-    const now = Date.now();
-    const elapsed = Math.floor((now - lastUpdateTime) / 1000);
-    
-    // Only update if a full second has passed
-    if (elapsed > 0) {
+    // Only decrement time if the game has started (modal dismissed)
+    if (!showStartGameModal) {
       // Only decrement time for the current player
       if (game.current_player === 'X') {
-        displayedXTimeRemaining = Math.max(0, serverPlayerXTimeRemaining - elapsed);
-        displayedOTimeRemaining = serverPlayerOTimeRemaining;
+        displayedXTimeRemaining = Math.max(0, displayedXTimeRemaining - 1);
       } else {
-        displayedOTimeRemaining = Math.max(0, serverPlayerOTimeRemaining - elapsed);
-        displayedXTimeRemaining = serverPlayerXTimeRemaining;
+        displayedOTimeRemaining = Math.max(0, displayedOTimeRemaining - 1);
       }
       
-      // Check for warning conditions based on inactivity
-      if (isMyTurn && elapsed >= 15 && !warningInterval) {  // Show warning after 15 seconds of inactivity
+      // Check for warning conditions
+      if (isMyTurn && !warningInterval && timeRemaining <= 25) {
         startWarningCountdown();
       }
     }
   }
 
   function updateTimesFromServer(xTime, oTime) {
-    // Don't start timing until both players have joined and countdown is complete
-    if (!game?.game_started || !playerO) return;
-
-    // Initialize the timer if this is the first update
-    if (lastUpdateTime === null) {
-      timeUpdateInterval = setInterval(updateDisplayTimes, 1000);  // Update every second instead of 100ms
-    }
-    
-    // Only update the times if they've changed from the server
-    if (xTime !== serverPlayerXTimeRemaining || oTime !== serverPlayerOTimeRemaining) {
-      serverPlayerXTimeRemaining = xTime;
-      serverPlayerOTimeRemaining = oTime;
+    // Only update times if the current player has changed
+    if (game?.current_player !== lastPlayer) {
       displayedXTimeRemaining = xTime;
       displayedOTimeRemaining = oTime;
-      lastUpdateTime = Date.now();
+      lastPlayer = game?.current_player;
     }
-  }
-
-  async function tryJoinGame() {
-    if (!player?.name) return false;
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/games/${gameId}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          player_id: $playerId,
-        })
-      });
-      if (response.ok) {
-        return true;
-      }
-    } catch (error) {
-      console.error('Error joining game:', error);
-    }
-    return false;
   }
 
   async function fetchGameState() {
     try {
       const response = await fetch(`${API_BASE_URL}/games/${gameId}`);
+      if (!response.ok) {
+        // If game doesn't exist, redirect to home
+        navigate('/');
+        return;
+      }
       const data = await response.json();
-      
-      // Store previous state to detect changes
-      const hadPlayerO = playerO !== null;
       
       // Store full game data
       game = data;
       
-      // Determine if we need to fetch opponent data
-      const needToFetchOpponent = (!opponent && (playerX || playerO)) || (!hadPlayerO && game.player_o.id) || game.game_over;
-      
-      // Fetch opponent stats when needed
-      if (needToFetchOpponent) {
-        updatePollingInterval();
-        const opponentId = $playerId === playerX ? playerO : playerX;
-        if (opponentId) {
-          try {
-            const response = await fetch(`${API_BASE_URL}/players/${opponentId}`);
-            opponent = await response.json();
-          } catch (error) {
-            console.error('Error fetching opponent data:', error);
-          }
-        }
-      }
-      
-      // Check if second player just joined
-      if (game.player_o.id && !game.game_started && !showStartGameModal && !startGameModalShown) {
-        showStartGameModal = true;
-        startGameModalShown = true; // Mark that we've shown the modal
-      }
-      
-      // Update server times
-      updateTimesFromServer(data.player_x.time_remaining, data.player_o.time_remaining);
-      
-      isPlayer = false;
-      playerSymbol = null;
-
-      if (data.player_x.id === $playerId) {
-        isPlayer = true;
-        playerSymbol = "X";
-      } else if (data.player_o.id === $playerId) {
-        isPlayer = true;
-        playerSymbol = "O";
-      } else if (!hasTriedToJoin && !data.player_o.id && !data.game_over && player?.name) {
-        hasTriedToJoin = true;
-        const joined = await tryJoinGame();
-        if (joined) {
-          await fetchGameState();
+      // Set player symbol on first load
+      if (!playerSymbol) {
+        if (data.player_x.id === $playerId) {
+          playerSymbol = "X";
+        } else if (data.player_o.id === $playerId) {
+          playerSymbol = "O";
+        } else {
+          // If not a player, redirect to home
+          navigate('/');
           return;
         }
       }
+      
+      // Update times
+      updateTimesFromServer(data.player_x.time_remaining, data.player_o.time_remaining);
     } catch (error) {
       console.error('Error fetching game state:', error);
+      navigate('/');
     }
   }
 
@@ -234,13 +161,12 @@
       });
       const data = await response.json();
       game = data; // Update game state directly
-      lastUpdateTime = Date.now();  // Reset the inactivity timer
       
       // Update server times
       updateTimesFromServer(data.player_x.time_remaining, data.player_o.time_remaining);
 
-      if (data.game_over && isPlayer && !gameEndModalDismissed) {
-        // Game just ended and we're a player - handle game end
+      if (data.game_over && !gameEndModalDismissed) {
+        // Game just ended - handle game end
         clearInterval(pollInterval);
         clearInterval(timeUpdateInterval);
         clearInterval(warningInterval);
@@ -271,20 +197,23 @@
     return classes.join(' ');
   }
 
-  function copyGameUrl() {
-    navigator.clipboard.writeText(gameUrl);
-    showCopiedMessage = true;
-    setTimeout(() => {
-      showCopiedMessage = false;
-    }, 2000);
-  }
-
   onMount(async () => {
-    await fetchPlayerData();
+    if (!$playerId) {
+      navigate('/');
+      return;
+    }
+    
+    // First fetch game state
     await fetchGameState();
     
-    // Start with slower polling while waiting for opponent
-    pollInterval = setInterval(fetchGameState, 3000);
+    // Set up polling for game state
+    pollInterval = setInterval(fetchGameState, 1000);
+    
+    // Set up time updates
+    timeUpdateInterval = setInterval(updateDisplayTimes, 1000);
+    
+    // Mark loading as complete
+    isLoading = false;
   });
 
   onDestroy(() => {
@@ -327,8 +256,8 @@
         const data = await response.json();
         game = data; // Update game state directly
         
-        if (data.game_over && isPlayer && !gameEndModalDismissed) {
-          // Game just ended and we're a player - handle game end
+        if (data.game_over && isMyTurn && !gameEndModalDismissed) {
+          // Game just ended - handle game end
           clearInterval(pollInterval);
           clearInterval(timeUpdateInterval);
           clearInterval(warningInterval);
@@ -347,24 +276,22 @@
   }
 
   async function handleGameStart() {
+    showStartGameModal = false;
+    
+    // Only player X needs to signal they're ready to start
     if (playerSymbol === 'X') {
-      // Only player X sends the start game API call
       try {
-        const response = await fetch(`${API_BASE_URL}/games/${gameId}/start?player_id=${$playerId}`, {
+        const response = await fetch(`${API_BASE_URL}/games/${gameId}/ready?player_id=${$playerId}`, {
           method: 'POST'
         });
         
         if (response.ok) {
           const data = await response.json();
-          showStartGameModal = false;
           game = data; // Update game state directly
         }
       } catch (error) {
         console.error('Error starting game:', error);
       }
-    } else {
-      // Player O just updates their local state
-      showStartGameModal = false;
     }
   }
 
@@ -373,102 +300,62 @@
     gameEndModalDismissed = true;
     eloChange = null; // Reset the stored ELO change
   }
-
-  // Add this function to update polling frequency
-  function updatePollingInterval() {
-    // Clear existing interval
-    if (pollInterval) {
-      clearInterval(pollInterval);
-    }
-    
-    // Poll every second during active games, every 3 seconds while waiting
-    const interval = (playerO && !game?.game_over) ? 1000 : 3000;
-    pollInterval = setInterval(fetchGameState, interval);
-  }
 </script>
 
 {#if isLoading}
   <div class="loading">Loading...</div>
-{:else if !player?.name}
-  <PlayerNameModal />
 {:else if game}
 <main>
   <div class="game-info">
-    {#if !game.game_started && !game.game_over}
-      <!-- Before game starts -->
-      <button class="share" on:click={copyGameUrl}>
-        {showCopiedMessage ? 'URL Copied!' : 'Share Game URL'}
-      </button>
-      <button class="home" on:click={() => navigate('/')}>Cancel</button>
-    {:else if game.game_started && !game.game_over}
-      <!-- During active game -->
-      {#if isPlayer}
-        <div class="resign-container">
-          {#if showResignConfirm}
-            <div class="resign-confirm">
-              <span>Resign game?</span>
-              <div class="resign-buttons">
-                <button class="confirm" on:click={() => {
-                  resignGame();
-                  showResignConfirm = false;
-                }}>Yes</button>
-                <button class="cancel" on:click={() => showResignConfirm = false}>No</button>
-              </div>
-            </div>
-          {:else}
-            <button class="resign" on:click={() => showResignConfirm = true}>Resign Game</button>
-          {/if}
-        </div>
-      {/if}
-    {:else if game.game_over}
-      <!-- After game ends -->
+    {#if game.game_over}
       <button class="home" on:click={() => navigate('/')}>Back to Home</button>
       <button class="analyze" disabled>Analyze Moves</button>
+    {:else}
+      <div class="resign-container">
+        {#if showResignConfirm}
+          <div class="resign-confirm">
+            <span>Resign game?</span>
+            <div class="resign-buttons">
+              <button class="confirm" on:click={() => {
+                resignGame();
+                showResignConfirm = false;
+              }}>Yes</button>
+              <button class="cancel" on:click={() => showResignConfirm = false}>No</button>
+            </div>
+          </div>
+        {:else}
+          <button class="resign" on:click={() => showResignConfirm = true}>Resign Game</button>
+        {/if}
+      </div>
     {/if}
   </div>
 
-  <div class="game-header" class:mobile-hidden={game.game_started && !game.game_over}>
+  <div class="game-header" class:mobile-hidden={gameStarted && !game.game_over}>
     <h1>{game.name}</h1>
     
     <div class="players">
       <div class="player player-x">
-        <strong>Player X:</strong> {playerX ? (playerSymbol === 'X' ? player.name : opponent?.name) || 'Waiting...' : 'Waiting...'}
-        {#if playerX}
-          <div class="player-stats">
-            {#if playerSymbol === 'X'}
-              <span>ELO: {player.elo}</span>
-              <span>Wins: {player.wins}</span>
-              <span>Win Rate: {calculateWinRate(player)}%</span>
-            {:else if opponent}
-              <span>ELO: {opponent.elo}</span>
-              <span>Wins: {opponent.wins || 0}</span>
-              <span>Win Rate: {calculateWinRate(opponent)}%</span>
-            {/if}
-          </div>
-        {/if}
+        <strong>Player X:</strong> {game.player_x.name}
+        <div class="player-stats">
+          <span>ELO: {game.player_x.elo}</span>
+          <span>Wins: {game.player_x.wins}</span>
+          <span>Win Rate: {calculateWinRate(game.player_x)}%</span>
+        </div>
       </div>
       <div class="player player-o">
-        <strong>Player O:</strong> {playerO ? (playerSymbol === 'O' ? player.name : opponent?.name) || 'Waiting...' : 'Waiting...'}
-        {#if playerO}
-          <div class="player-stats">
-            {#if playerSymbol === 'O'}
-              <span>ELO: {player.elo}</span>
-              <span>Wins: {player.wins}</span>
-              <span>Win Rate: {calculateWinRate(player)}%</span>
-            {:else if opponent}
-              <span>ELO: {opponent.elo}</span>
-              <span>Wins: {opponent.wins || 0}</span>
-              <span>Win Rate: {calculateWinRate(opponent)}%</span>
-            {/if}
-          </div>
-        {/if}
+        <strong>Player O:</strong> {game.player_o.name}
+        <div class="player-stats">
+          <span>ELO: {game.player_o.elo}</span>
+          <span>Wins: {game.player_o.wins}</span>
+          <span>Win Rate: {calculateWinRate(game.player_o)}%</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class:game-active-view={game.game_started && !game.game_over}>
+  <div class:game-active-view={gameStarted && !game.game_over}>
     <div class="time-display">
-      {#if game.game_started}
+      {#if gameStarted}
         <div class="player x">X Time: {formatTime(displayedXTimeRemaining)}</div>
         <div class="player o">O Time: {formatTime(displayedOTimeRemaining)}</div>
       {:else}
@@ -479,17 +366,9 @@
 
     <div class="status">
       {#if game.winner}
-        Winner: {game.winner === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}!
+        Winner: {game.winner === 'X' ? game.player_x.name : game.player_o.name}!
       {:else if game.game_over}
         Game Over - Draw!
-      {:else if !isPlayer}
-        {#if game.current_player === "X" && !playerO}
-          Waiting for player O to join...
-        {:else}
-          Spectating - {game.current_player === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)}'s turn
-        {/if}
-      {:else if !playerO}
-        Waiting for another player to join...
       {:else if game.current_player === playerSymbol}
         Your turn ({playerSymbol})
         {#if game.next_board !== null}
@@ -498,7 +377,7 @@
           - You can play in any available board
         {/if}
       {:else}
-        Waiting for {game.current_player === 'X' ? (playerSymbol === 'X' ? player.name : opponent?.name) : (playerSymbol === 'O' ? player.name : opponent?.name)} to move...
+        Waiting for {game.current_player === 'X' ? game.player_x.name : game.player_o.name} to move...
       {/if}
     </div>
 
@@ -514,7 +393,7 @@
               <button 
                 class="cell {cell.toLowerCase()}" 
                 on:click={() => makeMove(boardIndex, position)}
-                disabled={!isPlayer || game.current_player !== playerSymbol || cell || !isBoardPlayable(boardIndex)}
+                disabled={!isMyTurn || game.current_player !== playerSymbol || cell || !isBoardPlayable(boardIndex)}
               >
                 {cell}
               </button>
@@ -535,10 +414,10 @@
 
   {#if showStartGameModal}
     <StartGameModal
-      playerXName={playerX ? (playerSymbol === 'X' ? player.name : opponent?.name) : 'Unknown'}
-      playerOName={playerO ? (playerSymbol === 'O' ? player.name : opponent?.name) : 'Unknown'}
-      playerXStats={$playerId === playerX ? player : opponent}
-      playerOStats={$playerId === playerO ? player : opponent}
+      playerXName={game.player_x.name}
+      playerOName={game.player_o.name}
+      playerXStats={game.player_x}
+      playerOStats={game.player_o}
       on:start={handleGameStart}
     />
   {/if}
