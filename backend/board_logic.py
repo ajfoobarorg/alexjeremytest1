@@ -2,6 +2,8 @@ import logging
 import json
 from typing import List, Optional, Union
 
+logger = logging.getLogger(__name__)
+
 class Board:
     """Board logic for a single tic-tac-toe board."""
     
@@ -76,7 +78,7 @@ class GameLogic:
         """Check if there's a winner in a board or meta-board."""
         #TODO(aroetter): I don't think the meta-board comment above is correct.
         if isinstance(board, Board):
-            logging.fatal("TODO(aroetteR): CHECK TO SEE THIS NEVER HAPPENS. Consider deleting")
+            logger.fatal("TODO(aroetteR): CHECK TO SEE THIS NEVER HAPPENS. Consider deleting")
             return board.check_winner()
             
         # Handle list representation
