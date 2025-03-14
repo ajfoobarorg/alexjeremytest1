@@ -1,11 +1,19 @@
-import uuid
-from datetime import datetime
 import json
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 import math
 
 from models import Game, Player
 from board_logic import GameLogic
+
+from schemas import PlayerLevel
+
+# Starting ELO ratings for different player levels
+LEVEL_ELO_RATINGS = {
+    PlayerLevel.NEW: 200,
+    PlayerLevel.BEGINNER: 400,
+    PlayerLevel.INTERMEDIATE: 700,
+    PlayerLevel.ADVANCED: 900
+}
 
 class PlayerService:
     @staticmethod
@@ -15,24 +23,6 @@ class PlayerService:
             return Player.get(Player.id == player_id)
         except Player.DoesNotExist:
             return None
-    
-    @staticmethod
-    def get_or_create_player(player_id: str, player_name: Optional[str] = None) -> Player:
-        """Get an existing player or create a new one."""
-        try:
-            player = Player.get(Player.id == player_id)
-            # Update name if provided and different from current name
-            if player_name is not None and player.name != player_name:
-                player.name = player_name
-                player.save()
-            return player
-        except Player.DoesNotExist:
-            # For new players, ensure we have a name (use empty string if none provided)
-            name_to_use = player_name if player_name is not None else ""
-            return Player.create(
-                id=player_id,
-                name=name_to_use
-            )
     
     @staticmethod
     def calculate_elo_change(player_elo: int, opponent_elo: int, result: float, k_factor: int = 32) -> int:
@@ -87,7 +77,7 @@ class PlayerService:
     @staticmethod
     def update_player_stats(player_id: str, result: str) -> Player:
         """Update player stats after a game."""
-        player = PlayerService.get_or_create_player(player_id)
+        player = PlayerService.get_player(player_id)
         
         if result == 'win':
             player.wins += 1
@@ -99,17 +89,68 @@ class PlayerService:
         player.save()
         return player
     
+class ProfileService:
     @staticmethod
-    def update_player_name(player_id: str, name: str) -> bool:
-        """Update a player's name."""
+    def get_profile(player_id: str) -> Optional[Player]:
+        """Get a player's profile by ID."""
         try:
-            PlayerService.get_or_create_player(player_id, name)
-            return True
-        except Exception as e:
-            print(f"Error updating player name: {str(e)}")
-            return False
+            return Player.get(Player.id == player_id)
+        except Player.DoesNotExist:
+            return None
+    
+    @staticmethod
+    def get_profile_by_email(email: str) -> Optional[Player]:
+        """Get a player's profile by email."""
+        try:
+            return Player.get(Player.email == email)
+        except Player.DoesNotExist:
+            return None
+    
+    @staticmethod
+    def create_profile(username: str, email: str, level: str, timezone: Optional[str] = None, country: Optional[str] = None) -> Player:
+        """Create a new player profile."""
+        return Player.create(
+            username=username,
+            email=email,
+            level=level,
+            timezone=timezone,
+            country=country,
+            elo=LEVEL_ELO_RATINGS[level]
+        )
+    
+    @staticmethod
+    def update_profile(player_id: str, **update_data) -> Optional[Player]:
+        """Update a player's profile with the given data."""
+        try:
+            player = Player.get(Player.id == player_id)
+            for field, value in update_data.items():
+                if hasattr(player, field) and value is not None:
+                    setattr(player, field, value)
+            player.save()
+            return player
+        except Player.DoesNotExist:
+            return None
+    
+    @staticmethod
+    def check_username_exists(username: str) -> bool:
+        """Check if a username is already taken."""
+        return Player.select().where(Player.username == username).exists()
+    
+    @staticmethod
+    def check_email_exists(email: str) -> bool:
+        """Check if an email is already registered."""
+        return Player.select().where(Player.email == email).exists()
 
 class GameService:
+    @staticmethod
+    def create_game(player_x: Player, player_o: Player) -> Game:
+        """Create a new game with pre-assigned X and O players"""
+        game = Game.create(
+            player_x=player_x,
+            player_o=player_o
+        )
+        return game
+  
     @staticmethod
     def get_game(game_id: str) -> Optional[Game]:
         """Get a game by ID."""

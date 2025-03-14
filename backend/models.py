@@ -1,5 +1,6 @@
 import datetime
 import json
+import uuid
 from peewee import *
 from db_config import DB_PATH
 
@@ -12,25 +13,55 @@ class BaseModel(Model):
 
 class Player(BaseModel):
     """Player model representing a user of the game."""
-    id = CharField(primary_key=True)
-    name = CharField()
-    created_at = DateTimeField(default=datetime.datetime.now)
-    
-    # Player statistics
+    id = UUIDField(primary_key=True)
+    username = CharField(max_length=50, unique=True)
+    email = CharField(max_length=255, unique=True)
+    first_name = CharField(max_length=50, null=True)
+    last_name = CharField(max_length=50, null=True)
     wins = IntegerField(default=0)
     losses = IntegerField(default=0)
     draws = IntegerField(default=0)
-    elo = IntegerField(default=800)  # Default ELO rating for new players
+    elo = IntegerField(default=100)
+    location = CharField(max_length=100, null=True)
+    country = CharField(max_length=2, null=True)  # ISO 3166-1 alpha-2
+    timezone = CharField(max_length=50, null=True)  # IANA timezone name or UTC±HH:MM
+    created_at = DateTimeField(default=datetime.datetime.now)
+    last_active = DateTimeField(default=datetime.datetime.now)
+    
+    def save(self, *args, **kwargs):
+        """Override save to ensure ID is set for new players."""
+        if not self.id:
+            self.id = str(uuid.uuid4())
+        return super().save(*args, **kwargs)
+    
+    def to_dict(self):
+        """Convert model to dictionary for API response."""
+        return {
+            'id': str(self.id),
+            'username': self.username,
+            'email': self.email,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'location': self.location,
+            'country': self.country,
+            'timezone': self.timezone,
+            'stats': {
+                'wins': self.wins,
+                'losses': self.losses,
+                'draws': self.draws,
+                'elo': self.elo
+            }
+        }
 
 class Game(BaseModel):
     """Game model representing a single game of Ultimate Tic-Tac-Toe."""
-    id = CharField(primary_key=True)
-    name = CharField()
+    id = UUIDField(primary_key=True)
     current_player = CharField(default="X")
     next_board = IntegerField(null=True)
     winner = CharField(null=True)
     game_over = BooleanField(default=False)
     created_at = DateTimeField(default=datetime.datetime.now)
+    completed_at = DateTimeField(null=True)
     
     # Player references with foreign keys
     player_x = ForeignKeyField(Player, backref='games_as_x', null=True)
@@ -49,7 +80,14 @@ class Game(BaseModel):
     # JSON fields
     meta_board = TextField(default=json.dumps(["" for _ in range(9)]))
     boards = TextField(default=json.dumps([[""]*9 for _ in range(9)]))
-    
+
+    def save(self, *args, **kwargs):
+        """Override save to ensure ID is set for new games."""
+        if not self.id:
+            self.id = str(uuid.uuid4())
+        return super().save(*args, **kwargs)
+
+
     def get_time_remaining(self, player):
         """Get remaining time for a player in seconds."""
         time_used = self.player_x_time_used if player == 'X' else self.player_o_time_used
@@ -75,8 +113,7 @@ class Game(BaseModel):
         player_o_elo = self.player_o.elo if self.player_o else None
         
         return {
-            'id': self.id,
-            'name': self.name,
+            'id': str(self.id),
             'meta_board': json.loads(self.meta_board),
             'boards': json.loads(self.boards),
             'current_player': self.current_player,
@@ -84,15 +121,15 @@ class Game(BaseModel):
             'winner': self.winner,
             'game_over': self.game_over,
             'player_x': {
-                'id': self.player_x.id if self.player_x else None,
-                'name': self.player_x.name if self.player_x else None,
+                'id': str(self.player_x.id) if self.player_x else None,
+                'username': self.player_x.username if self.player_x else None,
                 'time_remaining': self.get_time_remaining('X'),
                 'elo': player_x_elo,
                 'elo_change': self.player_x_elo_change
             },
             'player_o': {
-                'id': self.player_o.id if self.player_o else None,
-                'name': self.player_o.name if self.player_o else None,
+                'id': str(self.player_o.id) if self.player_o else None,
+                'username': self.player_o.username if self.player_o else None,
                 'time_remaining': self.get_time_remaining('O'),
                 'elo': player_o_elo,
                 'elo_change': self.player_o_elo_change
