@@ -98,11 +98,3 @@ class MatchmakingResponse(BaseModel):
     game_id: Optional[str] = None
     opponent_name: Optional[str] = None
     message: Optional[str] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-    @validator('game_id')
-    def convert_uuid_to_str(cls, v):
-        if v is not None:
-            return str(v)
-        return v 

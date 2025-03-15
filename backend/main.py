@@ -38,7 +38,7 @@ def set_player_id_cookie(response: Response, player_id: str) -> None:
     """Helper function to set the player ID cookie consistently."""
     response.set_cookie(
         key="playerId",
-        value=str(player_id),
+        value=player_id,
         max_age=365 * 24 * 60 * 60,  # 1 year
         httponly=True,
         samesite="lax",  # Change from strict to lax for development
@@ -67,7 +67,7 @@ def signup(request: SignupRequest, response: Response) -> dict:
     
     # Set cookie with player ID
     set_player_id_cookie(response, player.id)
-    return {"id": str(player.id)}
+    return {"id": player.id}
 
 @app.post("/auth/login")
 def login(request: Request, request_data: LoginRequest, response: Response):
@@ -245,6 +245,7 @@ def ready_game(game_id: str, player_id: str) -> GameResponse:
     
     # Only player X can signal ready
     if game.player_x.id != player_id:
+        logging.error(f"Only player X can signal ready: {game.player_x.id} != {player_id}")
         raise HTTPException(status_code=400, detail="Only player X can signal ready")
     
     # Start the game by setting the initial last_move_time

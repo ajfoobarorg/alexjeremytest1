@@ -3,7 +3,6 @@ from threading import Lock
 import random
 import logging
 from datetime import datetime
-import uuid
 from typing import Optional, Tuple, Dict
 
 from models import Game, Player
@@ -111,7 +110,6 @@ class MatchmakingService:
                     return game, None, opponent_name, True
                 else:
                     # Still waiting for other player to accept
-                    logging.info(f"Still waiting for other player to accept {game_id}")
                     return None, None, opponent_name, False
             
             # Check if player is still in waiting list

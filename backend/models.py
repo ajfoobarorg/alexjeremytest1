@@ -1,6 +1,6 @@
 import datetime
 import json
-import uuid
+import shortuuid
 from peewee import *
 from db_config import DB_PATH
 
@@ -13,7 +13,7 @@ class BaseModel(Model):
 
 class Player(BaseModel):
     """Player model representing a user of the game."""
-    id = UUIDField(primary_key=True)
+    id = CharField(max_length=22, primary_key=True)  # shortuuid is always 22 chars
     username = CharField(max_length=50, unique=True)
     email = CharField(max_length=255, unique=True)
     first_name = CharField(max_length=50, null=True)
@@ -31,13 +31,13 @@ class Player(BaseModel):
     def save(self, *args, **kwargs):
         """Override save to ensure ID is set for new players."""
         if not self.id:
-            self.id = str(uuid.uuid4())
+            self.id = shortuuid.uuid()
         return super().save(*args, **kwargs)
     
     def to_dict(self):
         """Convert model to dictionary for API response."""
         return {
-            'id': str(self.id),
+            'id': self.id,  # No need for str() conversion
             'username': self.username,
             'email': self.email,
             'first_name': self.first_name,
@@ -55,7 +55,7 @@ class Player(BaseModel):
 
 class Game(BaseModel):
     """Game model representing a single game of Ultimate Tic-Tac-Toe."""
-    id = UUIDField(primary_key=True)
+    id = CharField(max_length=22, primary_key=True)  # shortuuid is always 22 chars
     current_player = CharField(default="X")
     next_board = IntegerField(null=True)
     winner = CharField(null=True)
@@ -84,9 +84,8 @@ class Game(BaseModel):
     def save(self, *args, **kwargs):
         """Override save to ensure ID is set for new games."""
         if not self.id:
-            self.id = str(uuid.uuid4())
+            self.id = shortuuid.uuid()
         return super().save(*args, **kwargs)
-
 
     def get_time_remaining(self, player):
         """Get remaining time for a player in seconds."""
@@ -113,7 +112,7 @@ class Game(BaseModel):
         player_o_elo = self.player_o.elo if self.player_o else None
         
         return {
-            'id': str(self.id),
+            'id': self.id,  # No need for str() conversion
             'meta_board': json.loads(self.meta_board),
             'boards': json.loads(self.boards),
             'current_player': self.current_player,
@@ -121,14 +120,14 @@ class Game(BaseModel):
             'winner': self.winner,
             'game_over': self.game_over,
             'player_x': {
-                'id': str(self.player_x.id) if self.player_x else None,
+                'id': self.player_x.id if self.player_x else None,  # No need for str() conversion
                 'username': self.player_x.username if self.player_x else None,
                 'time_remaining': self.get_time_remaining('X'),
                 'elo': player_x_elo,
                 'elo_change': self.player_x_elo_change
             },
             'player_o': {
-                'id': str(self.player_o.id) if self.player_o else None,
+                'id': self.player_o.id if self.player_o else None,  # No need for str() conversion
                 'username': self.player_o.username if self.player_o else None,
                 'time_remaining': self.get_time_remaining('O'),
                 'elo': player_o_elo,
