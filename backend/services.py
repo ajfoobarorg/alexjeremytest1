@@ -250,7 +250,7 @@ class GameService:
                     game.player_o_elo_change = o_elo_change
                     game.save()
                 
-                return game, None
+                return game, "Time control exceeded - game forfeited"
             
             # Verify the move is in the correct board
             if game.next_board is not None and game.next_board != board_index:

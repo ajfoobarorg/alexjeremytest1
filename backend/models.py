@@ -37,7 +37,7 @@ class Player(BaseModel):
     def to_dict(self):
         """Convert model to dictionary for API response."""
         return {
-            'id': self.id,  # No need for str() conversion
+            'id': self.id,  
             'username': self.username,
             'email': self.email,
             'first_name': self.first_name,
@@ -103,6 +103,7 @@ class Game(BaseModel):
             self.player_o_time_used += elapsed
             
         self.last_move_time = now
+        self.save()  # Save the updated time
         return self.get_time_remaining(self.current_player)
     
     def to_dict(self):
@@ -112,7 +113,7 @@ class Game(BaseModel):
         player_o_elo = self.player_o.elo if self.player_o else None
         
         return {
-            'id': self.id,  # No need for str() conversion
+            'id': self.id,  
             'meta_board': json.loads(self.meta_board),
             'boards': json.loads(self.boards),
             'current_player': self.current_player,
@@ -120,14 +121,14 @@ class Game(BaseModel):
             'winner': self.winner,
             'game_over': self.game_over,
             'player_x': {
-                'id': self.player_x.id if self.player_x else None,  # No need for str() conversion
+                'id': self.player_x.id if self.player_x else None,  
                 'username': self.player_x.username if self.player_x else None,
                 'time_remaining': self.get_time_remaining('X'),
                 'elo': player_x_elo,
                 'elo_change': self.player_x_elo_change
             },
             'player_o': {
-                'id': self.player_o.id if self.player_o else None,  # No need for str() conversion
+                'id': self.player_o.id if self.player_o else None,  
                 'username': self.player_o.username if self.player_o else None,
                 'time_remaining': self.get_time_remaining('O'),
                 'elo': player_o_elo,

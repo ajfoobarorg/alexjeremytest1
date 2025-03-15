@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Response, Cookie, Request
+from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import datetime

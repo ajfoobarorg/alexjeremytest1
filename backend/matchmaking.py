@@ -2,8 +2,7 @@ from cachetools import TTLCache
 from threading import Lock
 import random
 import logging
-from datetime import datetime
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple
 
 from models import Game, Player
 from services import ProfileService, GameService
@@ -107,6 +106,7 @@ class MatchmakingService:
                     game = Game.get(Game.id == game_id)
                     if not game:
                         logging.error(f"Game {game_id} not found after both players have accepted")
+                        return None, "Game not found", None, None
                     return game, None, opponent_name, True
                 else:
                     # Still waiting for other player to accept
@@ -145,3 +145,15 @@ class MatchmakingService:
                         return None, f"Error creating game: {str(e)}", None, None
             
             return None, None, None, None 
+
+    @staticmethod
+    def is_player_in_queue(player_id: str) -> bool:
+        """Check if a player is in the waiting queue."""
+        MatchmakingService.waiting_players.expire()
+        return player_id in MatchmakingService.waiting_players
+
+    @staticmethod
+    def has_pending_match(player_id: str) -> bool:
+        """Check if a player has a pending match."""
+        MatchmakingService.matched_games.expire()
+        return player_id in MatchmakingService.matched_games 
