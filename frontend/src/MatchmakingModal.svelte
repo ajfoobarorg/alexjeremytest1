@@ -68,8 +68,13 @@
 
       const data = await response.json();
       
+      console.log('Matchmaking ping response:', data);  // Debug log
+      
       if (data.status === 'matched') {
-        // Game found and both players have accepted, navigate to the game
+        // Game found and both players have accepted
+        console.log('Match found, navigating to game:', data.game_id);
+        
+        // Clear interval and navigate
         clearInterval(intervalId);
         intervalId = null;
         navigate(`/game/${data.game_id}`);

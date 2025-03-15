@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { playerId } from './stores.js';
+  import { playerId, authLoading } from './stores.js';
   import { navigate } from './router.js';
   import GameEndModal from './GameEndModal.svelte';
   import { API_BASE_URL } from './config.js';
@@ -46,23 +46,7 @@
   $: showWarning = isMyTurn && (warningCountdown !== null || (timeRemaining !== null && timeRemaining <= 25)) && !game?.game_over;
   $: gameStarted = !showStartGameModal;  // Game has started when start modal is dismissed
 
-  async function fetchPlayerData() {
-    try {
-      const response = await fetch(`${API_BASE_URL}/players/${$playerId}`);
-      if (response.ok) {
-        player = await response.json();
-      } else {
-        // If we can't fetch player data, redirect to home
-        navigate('/');
-        return;
-      }
-    } catch (error) {
-      console.error('Error fetching player data:', error);
-      navigate('/');
-      return;
-    }
-  }
-
+  
   // Function to handle game end
   async function handleGameEnd() {
     if (handlingGameEnd) return;
@@ -71,9 +55,6 @@
     try {
       // Store the ELO change before fetching updated player data
       eloChange = playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change;
-      
-      // Fetch latest player data to ensure we have the updated ELO rating
-      await fetchPlayerData();
       showGameEndModal = true;
     } finally {
       handlingGameEnd = false;
@@ -198,8 +179,8 @@
   }
 
   onMount(async () => {
-    if (!$playerId) {
-      navigate('/');
+    // Wait for auth to finish loading and ensure we have a playerId
+    if ($authLoading || !$playerId) {
       return;
     }
     
@@ -215,6 +196,14 @@
     // Mark loading as complete
     isLoading = false;
   });
+
+  // Reactive statement to handle auth state changes
+  $: if (!$authLoading) {
+    if (!$playerId) {
+      // Only navigate away if auth is done loading and we have no playerId
+      navigate('/');
+    }
+  }
 
   onDestroy(() => {
     clearInterval(pollInterval);
@@ -300,6 +289,7 @@
     gameEndModalDismissed = true;
     eloChange = null; // Reset the stored ELO change
   }
+
 </script>
 
 {#if isLoading}
@@ -335,7 +325,7 @@
     
     <div class="players">
       <div class="player player-x">
-        <strong>Player X:</strong> {game.player_x.name}
+        <strong>Player X:</strong> {game.player_x.username}
         <div class="player-stats">
           <span>ELO: {game.player_x.elo}</span>
           <span>Wins: {game.player_x.wins}</span>
@@ -343,7 +333,7 @@
         </div>
       </div>
       <div class="player player-o">
-        <strong>Player O:</strong> {game.player_o.name}
+        <strong>Player O:</strong> {game.player_o.username}
         <div class="player-stats">
           <span>ELO: {game.player_o.elo}</span>
           <span>Wins: {game.player_o.wins}</span>
@@ -366,7 +356,7 @@
 
     <div class="status">
       {#if game.winner}
-        Winner: {game.winner === 'X' ? game.player_x.name : game.player_o.name}!
+        Winner: {game.winner === 'X' ? game.player_x.username : game.player_o.username}!
       {:else if game.game_over}
         Game Over - Draw!
       {:else if game.current_player === playerSymbol}
@@ -377,7 +367,7 @@
           - You can play in any available board
         {/if}
       {:else}
-        Waiting for {game.current_player === 'X' ? game.player_x.name : game.player_o.name} to move...
+        Waiting for {game.current_player === 'X' ? game.player_x.username : game.player_o.username} to move...
       {/if}
     </div>
 
@@ -414,8 +404,8 @@
 
   {#if showStartGameModal}
     <StartGameModal
-      playerXName={game.player_x.name}
-      playerOName={game.player_o.name}
+      playerXName={game.player_x.username}
+      playerOName={game.player_o.username}
       playerXStats={game.player_x}
       playerOStats={game.player_o}
       on:start={handleGameStart}
@@ -426,7 +416,7 @@
     <GameEndModal
       isWinner={game.winner === playerSymbol}
       isDraw={game.game_over && !game.winner}
-      playerName={player.name}
+      playerName={player.username}
       stats={player}
       eloChange={eloChange !== null ? eloChange : (playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change)}
       on:dismiss={dismissGameEndModal}

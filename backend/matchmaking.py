@@ -2,12 +2,10 @@ from cachetools import TTLCache
 from threading import Lock
 import random
 import logging
-from datetime import datetime
-import uuid
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple
 
 from models import Game, Player
-from services import PlayerService
+from services import ProfileService, GameService
 
 class MatchmakingService:
     # TTL of 30 seconds for waiting players and matches
@@ -22,7 +20,7 @@ class MatchmakingService:
     @staticmethod
     def add_player(player_id: str) -> bool:
         """Add a player to the waiting list"""
-        player = PlayerService.get_player(player_id)
+        player = ProfileService.get_profile(player_id)
         if not player:
             return False
         
@@ -83,17 +81,7 @@ class MatchmakingService:
         else:
             player_x, player_o = player2, player1
         
-        game_id = str(uuid.uuid4())
-        game = Game.create(
-            id=game_id,
-            name=f"Game: {player_x.name} vs {player_o.name}",
-            current_player="X",
-            next_board=None,
-            created_at=datetime.now(),
-            player_x=player_x,
-            player_o=player_o
-        )
-        return game
+        return GameService.create_game(player_x, player_o)
     
     @staticmethod
     def find_match(player_id: str) -> Tuple[Optional[Game], Optional[str], Optional[str], Optional[bool]]:
@@ -113,8 +101,12 @@ class MatchmakingService:
                 
                 if both_accepted:
                     # Both players have accepted, clean up and start the game
+                    logging.info(f"Both players have accepted, cleaning up and starting game {game_id}")
                     del MatchmakingService.matched_games[player_id]
                     game = Game.get(Game.id == game_id)
+                    if not game:
+                        logging.error(f"Game {game_id} not found after both players have accepted")
+                        return None, "Game not found", None, None
                     return game, None, opponent_name, True
                 else:
                     # Still waiting for other player to accept
@@ -138,17 +130,30 @@ class MatchmakingService:
                     try:
                         # Create the game
                         game = MatchmakingService.create_game(player, other_player)
+                        logging.info(f"Created game {game.id} between {player.username} and {other_player.username}")
                         
                         # Store the game ID and opponent names for both players
-                        MatchmakingService.matched_games[player_id] = (game.id, other_player.name, False)
-                        MatchmakingService.matched_games[other_id] = (game.id, player.name, False)
+                        MatchmakingService.matched_games[player_id] = (game.id, other_player.username, False)
+                        MatchmakingService.matched_games[other_id] = (game.id, player.username, False)
                         
                         # Remove both players from waiting list
                         del MatchmakingService.waiting_players[player_id]
                         del MatchmakingService.waiting_players[other_id]
                         
-                        return None, None, other_player.name, False
+                        return None, None, other_player.username, False
                     except Exception as e:
                         return None, f"Error creating game: {str(e)}", None, None
             
             return None, None, None, None 
+
+    @staticmethod
+    def is_player_in_queue(player_id: str) -> bool:
+        """Check if a player is in the waiting queue."""
+        MatchmakingService.waiting_players.expire()
+        return player_id in MatchmakingService.waiting_players
+
+    @staticmethod
+    def has_pending_match(player_id: str) -> bool:
+        """Check if a player has a pending match."""
+        MatchmakingService.matched_games.expire()
+        return player_id in MatchmakingService.matched_games 
