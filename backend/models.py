@@ -3,6 +3,7 @@ import json
 import shortuuid
 from peewee import *
 from db_config import DB_PATH
+from backend.board_logic import MetaBoard
 
 # Initialize database
 db = SqliteDatabase(DB_PATH)
@@ -112,9 +113,10 @@ class Game(BaseModel):
         player_x_elo = self.player_x.elo if self.player_x else None
         player_o_elo = self.player_o.elo if self.player_o else None
         
+        meta = MetaBoard(self.meta_board)
         return {
             'id': self.id,  
-            'meta_board': json.loads(self.meta_board),
+            'meta_board': meta.to_list(),
             'boards': json.loads(self.boards),
             'current_player': self.current_player,
             'next_board': self.next_board,
