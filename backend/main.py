@@ -42,10 +42,10 @@ def set_player_id_cookie(response: Response, player_id: str) -> None:
         value=player_id,
         max_age=365 * 24 * 60 * 60,  # 1 year
         httponly=True,
-        samesite="lax",  # Change from strict to lax for development
+        samesite="lax",  # Allow cross-site requests while maintaining security
         secure=config.IS_PRODUCTION,  # Only set secure in production
         path="/",
-        domain=None  # Let the browser set the appropriate domain
+        domain=config.BACKEND_DOMAIN  # Set to backend domain explicitly
     )
 
 # Auth endpoints
@@ -86,7 +86,8 @@ def logout(response: Response):
         httponly=True,
         samesite="lax",
         path="/",
-        secure=config.IS_PRODUCTION
+        secure=config.IS_PRODUCTION,
+        domain=config.BACKEND_DOMAIN
     )
     return {"message": "Logged out successfully"}
 
