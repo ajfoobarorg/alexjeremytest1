@@ -1,166 +1,237 @@
 <script>
   import { onMount } from 'svelte';
   import { navigate } from './router.js';
-  import { playerId } from './stores.js';
-  import PlayerNameModal from './PlayerNameModal.svelte';
+  import { isAuthenticated, myPlayerData } from './stores.js';
+  import { calculateWinRate } from './utils.js';
+  import SampleBoard from './SampleBoard.svelte';
   import MatchmakingModal from './MatchmakingModal.svelte';
   import { API_BASE_URL } from './config.js';
 
-  // Player data
-  let player = null;
-  
-  // UI state
-  let isLoading = true;
+  // Game stats
+  let gamesCount = 0;
+  let playersOnline = 0;
   let showMatchmaking = false;
 
-  async function fetchPlayerData() {
+  async function fetchGameStats() {
     try {
-      const response = await fetch(`${API_BASE_URL}/players/${$playerId}`);
+      const response = await fetch(`${API_BASE_URL}/stats`);
       if (response.ok) {
-        player = await response.json();
+        const data = await response.json();
+        gamesCount = data.games_today;
+        playersOnline = data.players_online;
       }
     } catch (error) {
-      console.error('Error fetching player data:', error);
-    } finally {
-      isLoading = false;
+      console.error('Error fetching game stats:', error);
     }
   }
 
   onMount(async () => {
-    await fetchPlayerData();
+    await fetchGameStats();
+    // Refresh stats every minute
+    setInterval(fetchGameStats, 60000);
   });
 </script>
 
-{#if isLoading}
-  <div class="loading">Loading...</div>
-{:else if !player?.name}
-  <PlayerNameModal />
-{:else}
-<main>
-  <h1>Ultimate Tic-Tac-Toe</h1>
-  
-  <div class="player-info">
-    <h2 class="player-name">{player.name} <span class="elo">({player.elo})</span></h2>
-    <p class="player-stats">{player.wins} wins / {player.draws} draws / {player.losses} losses</p>
-  </div>
+<div class="home-container">
+  {#if $isAuthenticated}
+    <!-- Logged in view -->
+    {#if $myPlayerData}
+      <div class="user-stats">
+        <div class="stat-item">
+          <span class="stat-label">Rating</span>
+          <span class="stat-value">{$myPlayerData.stats.elo}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Win Rate</span>
+          <span class="stat-value">{calculateWinRate($myPlayerData.stats)}%</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Record</span>
+          <span class="stat-value">{$myPlayerData.stats.wins}W-{$myPlayerData.stats.losses}L-{$myPlayerData.stats.draws}D</span>
+        </div>
+      </div>
+    {/if}
 
-  <div class="find-match">
-    <h2>Play Online</h2>
-    <button class="find-match-button" on:click={() => showMatchmaking = true}>
-      Let's play!
-    </button>
-  </div>
+    <div class="play-buttons">
+      <button class="play-online-btn" on:click={() => showMatchmaking = true}>
+        Play Online
+      </button>
+      <button class="play-bot-btn" disabled>
+        Play Bots <span class="coming-soon">(Coming Soon)</span>
+      </button>
+    </div>
+  {:else}
+    <!-- Logged out view -->
+    <div class="hero-section">
+      <div class="sample-board-container">
+        <SampleBoard />
+      </div>
+      
+      <div class="hero-content">
+        <h1>The World's Home for Ultimate Tic Tac Toe</h1>
+        
+        <div class="stats-row">
+          <div class="stat">
+            <span class="stat-number">{gamesCount.toLocaleString()}</span>
+            <span class="stat-label">Games Today</span>
+          </div>
+          <div class="stat">
+            <span class="stat-number">{playersOnline.toLocaleString()}</span>
+            <span class="stat-label">Playing Now</span>
+          </div>
+        </div>
 
-  {#if showMatchmaking}
-    <MatchmakingModal 
-      playerId={$playerId}
-      onClose={() => showMatchmaking = false}
-    />
+        <div class="play-buttons">
+          <button class="play-online-btn" on:click={() => navigate('/signup')}>
+            Play Online
+          </button>
+          <button class="play-bot-btn" disabled>
+            Play Bots <span class="coming-soon">(Coming Soon)</span>
+          </button>
+        </div>
+      </div>
+    </div>
   {/if}
-</main>
+</div>
+
+{#if showMatchmaking}
+  <MatchmakingModal 
+    playerId={$myPlayerData.id}
+    onClose={() => showMatchmaking = false}
+  />
 {/if}
 
 <style>
-  main {
-    max-width: 800px;
+  .home-container {
+    max-width: 1200px;
     margin: 0 auto;
     padding: 2rem;
-    font-family: Arial, sans-serif;
+  }
+
+  .hero-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+  }
+
+  @media (max-width: 768px) {
+    .hero-section {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .sample-board-container {
+      max-width: 400px;
+      margin: 0 auto;
+    }
+  }
+
+  .hero-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
   }
 
   h1 {
+    font-size: clamp(2rem, 4vw, 3rem);
     color: #333;
-    text-align: center;
-    margin-bottom: 2rem;
+    margin: 0;
+    line-height: 1.2;
   }
 
-  h2 {
-    color: #444;
-    margin-top: 2rem;
-  }
-
-  .player-info {
-    background: #e8f5e9;
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    width: 100%;
-    max-width: 600px;
-    margin: 0 auto 2rem auto;
-    text-align: center;
-    border: 2px solid #2e7d32;
-    transition: transform 0.2s;
-  }
-
-  .player-info:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-
-  .player-name {
-    margin: 0 0 0.5rem 0;
-    color: #2e7d32;
-    font-size: 1.8rem;
+  .stats-row {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
+    gap: 2rem;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
     gap: 0.5rem;
   }
 
-  .elo {
+  .stat-number {
+    font-size: 1.5rem;
     font-weight: bold;
-    color: #2e7d32;
-    white-space: nowrap;
+    color: #333;
   }
 
-  .player-stats {
-    margin: 0;
-    font-size: 1.1rem;
-    color: #424242;
+  .stat-label {
+    color: #666;
   }
 
-  .find-match {
-    background: #e8f5e9;
-    padding: 2rem;
-    border-radius: 8px;
+  .user-stats {
+    display: flex;
+    gap: 2rem;
     margin-bottom: 2rem;
-    text-align: center;
+    flex-wrap: wrap;
   }
 
-  .find-match h2 {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    color: #2e7d32;
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 
-  .find-match-button {
+  .stat-item .stat-label {
+    font-size: 0.9rem;
+    color: #666;
+  }
+
+  .stat-item .stat-value {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #333;
+  }
+
+  .play-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 300px;
+  }
+
+  .play-online-btn {
     background: #2e7d32;
     color: white;
     border: none;
-    padding: 1rem 2rem;
+    padding: 1rem;
     border-radius: 4px;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
+    font-weight: bold;
     cursor: pointer;
-    transition: all 0.2s;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.2s;
   }
 
-  .find-match-button:hover {
+  .play-online-btn:hover {
     background: #1b5e20;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   }
 
-  .find-match-button:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  .play-bot-btn {
+    background: #1976d2;
+    color: white;
+    border: none;
+    padding: 1rem;
+    border-radius: 4px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
   }
 
-  .loading {
-    text-align: center;
-    padding: 2rem;
-    font-size: 1.2rem;
-    color: #666;
+  .play-bot-btn:hover:not(:disabled) {
+    background: #1565c0;
+  }
+
+  .play-bot-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+
+  .coming-soon {
+    font-size: 0.9rem;
+    font-weight: normal;
+    opacity: 0.8;
   }
 </style> 
