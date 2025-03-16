@@ -1,5 +1,16 @@
 # Alex Jeremy Test 1
 
+# Next Steps
+* Get the org stuff working, Gsuite, domain/cloudflare, github (if not already sorted)
+* Finish Building it
+    * Cookie issue
+    * MetaBoard refactor / removal
+    * Any other features we want.
+    * Strong types everywhere. BE: python or rust? FE: typescript? CSS linter? some HTML-template-checker?
+    * Why don't the tests work in Github action.
+* Implement the coding rules and feature PRD/Spec things
+* Ship this as an end to end app on a domain we own, with Google Login.
+
 
 # Arch notes
 Backend is FastAPI (a python backend)
