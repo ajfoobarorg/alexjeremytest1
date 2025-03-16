@@ -36,7 +36,6 @@ initialize_db()
 
 def set_player_id_cookie(response: Response, player_id: str) -> None:
     """Helper function to set the player ID cookie consistently."""
-    # Blank comment -- TODO(aroetter): delete
     response.set_cookie(
         key="playerId",
         value=player_id,
