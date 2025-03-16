@@ -34,11 +34,13 @@ jobs:
     - name: Run tests
       run: |
         pytest --cov=. --cov-report=xml
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./backend/coverage.xml
-        flags: backend
-        name: backend-python
-        fail_ci_if_error: true 
+ 
+# Requires a code coverage account, saving the secret for that account to github, etc
+# For now, just comment all this out, we can add in code coverage later   
+#    - name: Upload coverage to Codecov
+#      uses: codecov/codecov-action@v4
+#      with:
+#        file: ./backend/coverage.xml
+#        flags: backend
+#        name: backend-python
+#        fail_ci_if_error: true 
