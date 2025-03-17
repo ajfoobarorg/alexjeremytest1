@@ -59,6 +59,7 @@ class Game(BaseModel):
     current_player = CharField(default="X")
     next_board = IntegerField(null=True)
     winner = CharField(null=True)
+    started = BooleanField(default=False)
     game_over = BooleanField(default=False)
     created_at = DateTimeField(default=datetime.datetime.now)
     completed_at = DateTimeField(null=True)
@@ -68,7 +69,7 @@ class Game(BaseModel):
     player_o = ForeignKeyField(Player, backref='games_as_o', null=True)
     
     # Timing fields
-    last_move_time = DateTimeField(default=datetime.datetime.now)
+    last_move_time = DateTimeField(null=True)
     player_x_time_used = IntegerField(default=0)  # Time used in seconds
     player_o_time_used = IntegerField(default=0)  # Time used in seconds
     TOTAL_TIME_ALLOWED = 360  # 6 minutes in seconds
@@ -108,10 +109,6 @@ class Game(BaseModel):
     
     def to_dict(self):
         """Convert model to dictionary for API response."""
-        # Get player ELO ratings if available
-        player_x_elo = self.player_x.elo if self.player_x else None
-        player_o_elo = self.player_o.elo if self.player_o else None
-        
         return {
             'id': self.id,  
             'meta_board': json.loads(self.meta_board),
@@ -119,19 +116,16 @@ class Game(BaseModel):
             'current_player': self.current_player,
             'next_board': self.next_board,
             'winner': self.winner,
+            'started': self.started,
             'game_over': self.game_over,
             'player_x': {
                 'id': self.player_x.id if self.player_x else None,  
-                'username': self.player_x.username if self.player_x else None,
                 'time_remaining': self.get_time_remaining('X'),
-                'elo': player_x_elo,
                 'elo_change': self.player_x_elo_change
             },
             'player_o': {
                 'id': self.player_o.id if self.player_o else None,  
-                'username': self.player_o.username if self.player_o else None,
                 'time_remaining': self.get_time_remaining('O'),
-                'elo': player_o_elo,
                 'elo_change': self.player_o_elo_change
             }
         }

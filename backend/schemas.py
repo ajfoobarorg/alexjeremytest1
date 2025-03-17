@@ -65,10 +65,8 @@ class ProfileUpdateRequest(BaseModel):
 
 class GamePlayerInfo(BaseModel):
     id: Optional[str] = None
-    username: Optional[str] = None
     time_remaining: int = 360  # Default to 6 minutes in seconds
-    elo: Optional[int] = None
-    elo_change: Optional[int] = None
+    elo_change: Optional[int] = None  # Keep elo_change as it's specific to this game
 
 class GameResponse(BaseModel):
     id: str
@@ -77,6 +75,7 @@ class GameResponse(BaseModel):
     current_player: str
     next_board: Optional[int]
     winner: Optional[str]
+    started: bool
     game_over: bool
     player_x: GamePlayerInfo
     player_o: GamePlayerInfo

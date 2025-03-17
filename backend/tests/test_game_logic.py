@@ -5,8 +5,15 @@ from freezegun import freeze_time
 from services import GameService
 from models import Game, Player
 
+
 @pytest.mark.game_logic
 class TestGameLogic:
+    @staticmethod
+    def start_game(game):
+        game.last_move_time = datetime.now()
+        game.started = True
+        game.save()
+
     def test_move_to_completed_board(self, sample_players):
         """Test that moves to already completed boards are rejected."""
         # Set up a completed board (board 0)
@@ -22,6 +29,7 @@ class TestGameLogic:
             boards=json.dumps(boards),
             meta_board=json.dumps(meta_board)
         )
+        self.start_game(active_game)
         
         # Attempt move in completed board
         game, error = GameService.make_move(
@@ -42,7 +50,8 @@ class TestGameLogic:
             current_player="X",
             next_board=4
         )
-        
+        self.start_game(active_game)
+
         # Player O tries to move when it's X's turn
         game, error = GameService.make_move(
             active_game.id,
@@ -62,6 +71,7 @@ class TestGameLogic:
             current_player="X",
             next_board=4  # Must play in center board
         )
+        self.start_game(active_game)
         
         # Try to play in board 0
         game, error = GameService.make_move(
@@ -102,6 +112,7 @@ class TestGameLogic:
             boards=json.dumps(boards),
             meta_board=json.dumps(meta_board)
         )
+        self.start_game(active_game)
         
         # X makes winning move in board 8
         game, _ = GameService.make_move(
@@ -136,6 +147,7 @@ class TestGameLogic:
             boards=json.dumps(boards),
             meta_board=json.dumps(meta_board)
         )
+        self.start_game(active_game)
         
         # Make the move that completes both board 2 and the top row of meta board
         game, _ = GameService.make_move(
