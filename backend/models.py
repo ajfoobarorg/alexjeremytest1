@@ -75,7 +75,7 @@ class Game(BaseModel):
     player_o = ForeignKeyField(Player, backref='games_as_o', null=True)
     
     # Timing fields
-    last_move_time = DateTimeField(null=True)
+    last_move_time = DateTimeField(default=datetime.datetime.now)  # Ensure this is set on creation
     player_x_time_used = IntegerField(default=0)  # Time used in seconds
     player_o_time_used = IntegerField(default=0)  # Time used in seconds
     TOTAL_TIME_ALLOWED = 360  # 6 minutes in seconds

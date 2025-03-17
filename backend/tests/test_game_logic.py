@@ -175,13 +175,17 @@ class TestGameLogic:
                     "X", "O", "O",
                     "O", "X", ""]  # One move from tie
         
+        now = datetime.now()
         active_game = Game.create(
             player_x=sample_players[0],
             player_o=sample_players[1],
             current_player="X",
             next_board=1,
-            boards=json.dumps(boards)
+            boards=json.dumps(boards),
+            last_move_time=now,
+            created_at=now
         )
+        self.start_game(active_game)
         
         # Check that completed tied board shows as 'T'
         meta = active_game.get_meta_board()
