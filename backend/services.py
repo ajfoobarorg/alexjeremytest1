@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 import math
 
 from models import Game, Player
-from board_logic import GameLogic
+from board_logic import MetaBoard
 
 from schemas import PlayerLevel
 
@@ -256,34 +256,28 @@ class GameService:
             if game.next_board is not None and game.next_board != board_index:
                 return None, "Must play in the indicated board"
             
-            # Get boards from JSON
-            boards = json.loads(game.boards)
-            meta_board = json.loads(game.meta_board)
+            # Get boards as proper Board objects
+            boards = game.get_boards()
+            
+            # Get meta state as proper MetaBoard object
+            meta = game.get_meta_board()
             
             # Verify the move is valid
-            if meta_board[board_index] != "":
+            if not meta.is_board_playable(board_index):
                 return None, "Board already completed"
                 
-            if boards[board_index][position] != "":
+            if boards[board_index].get(position) != "":
                 return None, "Position already taken"
             
             # Make the move
-            boards[board_index][position] = game.current_player
+            boards[board_index].set(position, game.current_player)
             
-            # Check if the small board was won
-            board_winner = GameLogic.check_winner(boards[board_index])
-            if board_winner:
-                meta_board[board_index] = board_winner
-            # Check if the small board is full (tie)
-            elif GameLogic.is_board_full(boards[board_index]):
-                meta_board[board_index] = "T"  # T for Tie
+            # Save boards
+            game.set_boards(boards)
             
-            # Update game state
-            game.boards = json.dumps(boards)
-            game.meta_board = json.dumps(meta_board)
-            
-            # Check if the move resulted in a win on the meta board
-            meta_winner = GameLogic.check_winner(meta_board)
+            # Check for winner using new meta state
+            meta = game.get_meta_board()  # Recompute after move
+            meta_winner = meta.get_winner()
             if meta_winner:
                 game.winner = meta_winner
                 game.game_over = True
@@ -317,8 +311,8 @@ class GameService:
                 
                 return game, None
                 
-            # Check if the meta board is full (draw)
-            if GameLogic.is_board_full(meta_board):
+            # Check for draw
+            if meta.is_full():
                 game.game_over = True
                 game.save()
                 
@@ -338,9 +332,8 @@ class GameService:
                 
                 return game, None
             
-            # Set next board based on the position played
-            # If the target board is completed, player can choose any incomplete board
-            if meta_board[position] != "" or GameLogic.is_board_full(boards[position]):
+            # Set next board
+            if not meta.is_board_playable(position):
                 game.next_board = None
             else:
                 game.next_board = position

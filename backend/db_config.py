@@ -1,8 +1,21 @@
 import os
 import logging
+import sqlite3
 from config import config
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# Custom datetime adapter for SQLite
+def adapt_datetime(dt: datetime) -> str:
+    return dt.isoformat()
+
+def convert_datetime(s: bytes) -> datetime:
+    return datetime.fromisoformat(s.decode())
+
+# Register the adapters
+sqlite3.register_adapter(datetime, adapt_datetime)
+sqlite3.register_converter("datetime", convert_datetime)
 
 # Set database path
 if config.IS_PRODUCTION:

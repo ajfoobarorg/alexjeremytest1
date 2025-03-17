@@ -5,7 +5,6 @@ from freezegun import freeze_time
 from services import GameService
 from models import Game, Player
 
-
 @pytest.mark.game_logic
 class TestGameLogic:
     @staticmethod
@@ -19,15 +18,12 @@ class TestGameLogic:
         # Set up a completed board (board 0)
         boards = [[""]*9 for _ in range(9)]
         boards[0] = ["X", "X", "X", "O", "O", "", "", "", ""]  # X wins top row
-        meta_board = ["" for _ in range(9)]
-        meta_board[0] = "X"  # Mark board 0 as won by X
         
         active_game = Game.create(
             player_x=sample_players[0],
             player_o=sample_players[1],
             current_player="X",
-            boards=json.dumps(boards),
-            meta_board=json.dumps(meta_board)
+            boards=json.dumps(boards)
         )
         self.start_game(active_game)
         
@@ -94,12 +90,10 @@ class TestGameLogic:
         """Test complex scenario where next_board forces moves in specific pattern."""
         # Set up a scenario where player X can win by forcing O into bad positions
         boards = [[""]*9 for _ in range(9)]
-        meta_board = ["" for _ in range(9)]
         
         # X has won boards 0 and 4, needs board 8 for diagonal win
         boards[0] = ["X"]*3 + ["O"]*2 + [""]*4
         boards[4] = ["X"]*3 + ["O"]*2 + [""]*4
-        meta_board[0] = meta_board[4] = "X"
         
         # Board 8 is nearly won by X, needs one more move
         boards[8] = ["X", "X", "", "O", "O", "", "", "", ""]
@@ -109,8 +103,7 @@ class TestGameLogic:
             player_o=sample_players[1],
             current_player="X",
             next_board=8,  # Force play in board 8
-            boards=json.dumps(boards),
-            meta_board=json.dumps(meta_board)
+            boards=json.dumps(boards)
         )
         self.start_game(active_game)
         
@@ -124,17 +117,19 @@ class TestGameLogic:
         
         assert game.game_over
         assert game.winner == "X"
-        assert json.loads(game.meta_board).count("X") == 3  # Three boards won
+        
+        # Check meta board state through the proper interface
+        meta = game.get_meta_board()
+        meta_state = meta.to_list()
+        assert meta_state.count("X") == 3  # Three boards won
 
     def test_simultaneous_board_completion(self, sample_players):
         """Test edge case where a move completes both a small board and the meta board."""
         boards = [[""]*9 for _ in range(9)]
-        meta_board = ["" for _ in range(9)]
         
         # Set up two completed boards in a row for X
         for board_idx in [0, 1]:
             boards[board_idx] = ["X"]*3 + ["O"]*2 + [""]*4
-            meta_board[board_idx] = "X"
         
         # Set up board 2 for a winning move
         boards[2] = ["X", "X", "", "O", "O", "", "", "", ""]
@@ -144,8 +139,7 @@ class TestGameLogic:
             player_o=sample_players[1],
             current_player="X",
             next_board=2,
-            boards=json.dumps(boards),
-            meta_board=json.dumps(meta_board)
+            boards=json.dumps(boards)
         )
         self.start_game(active_game)
         
@@ -159,5 +153,53 @@ class TestGameLogic:
         
         assert game.game_over
         assert game.winner == "X"
-        meta_board = json.loads(game.meta_board)
-        assert meta_board[0] == meta_board[1] == meta_board[2] == "X" 
+        
+        # Check meta board state through the proper interface
+        meta = game.get_meta_board()
+        meta_state = meta.to_list()
+        assert meta_state[0] == meta_state[1] == meta_state[2] == "X"
+
+    def test_board_and_game_ties(self, sample_players):
+        """Test that boards and games can end in ties and are properly reflected in meta board."""
+        boards = [[""]*9 for _ in range(9)]
+        
+        # Set up a tied board (board 0)
+        boards[0] = ["X", "O", "X",
+                    "X", "O", "O",
+                    "O", "X", "X"]  # Tied board
+        
+        # Set up a board that will be tied next (board 1)
+        boards[1] = ["X", "O", "X",
+                    "X", "O", "O",
+                    "O", "X", ""]  # One move from tie
+        
+        now = datetime.now()
+        active_game = Game.create(
+            player_x=sample_players[0],
+            player_o=sample_players[1],
+            current_player="X",
+            next_board=1,
+            boards=json.dumps(boards),
+            last_move_time=now,
+            created_at=now
+        )
+        self.start_game(active_game)
+        
+        # Check that completed tied board shows as 'T'
+        meta = active_game.get_meta_board()
+        meta_state = meta.to_list()
+        assert meta_state[0] == "T"  # First board should be marked as tied
+        
+        # Complete the second board to a tie
+        game, _ = GameService.make_move(
+            active_game.id,
+            board_index=1,
+            position=8,
+            player_id=sample_players[0].id
+        )
+        
+        # Verify the second board is now also marked as tied
+        meta = game.get_meta_board()
+        meta_state = meta.to_list()
+        assert meta_state[1] == "T"  # Second board should now be tied
+        assert meta_state.count("T") == 2  # Should have two tied boards 

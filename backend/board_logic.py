@@ -49,44 +49,61 @@ class Board:
                 return board_as_list[line[0]]
         return None
 
-class GameLogic:
-    """Game logic for Ultimate Tic-Tac-Toe."""
+class MetaBoard:
+    """
+    Represents the meta-board in Ultimate Tic-Tac-Toe, tracking the state of the 9 larger boards.
+    Each position can be empty (""), won by a player ("X"/"O"), or tied ("T").
+    This is a read-only view computed from the actual board states.
+    """
     
-    @staticmethod
-    def get_boards_from_json(boards_json: str) -> List[Board]:
-        """Convert JSON boards to Board objects."""
-        boards_data = json.loads(boards_json)
-        return [Board(board) for board in boards_data]
-    
-    @staticmethod
-    def boards_to_json(boards: List[Board]) -> str:
-        """Convert Board objects to JSON."""
-        return json.dumps([board.to_list() for board in boards])
-    
-    @staticmethod
-    def is_board_playable(meta_board: Union[str, List[str]], board_index: int, board: Board) -> bool:
-        """Check if a board can be played in."""
-        # I believe meta_board list is just a list of nine strings, representing who was
-        # the winner of each board, or blank if no one has won on that board yet.
-        meta_board_list = json.loads(meta_board) if isinstance(meta_board, str) else meta_board
-        return meta_board_list[board_index] == "" and not board.is_full()
-    
-    @staticmethod
-    def check_winner(board: Union[List[str], Board]) -> Optional[str]:
-        """Check if there's a winner in a board or meta-board."""
-        #TODO(aroetter): I don't think the meta-board comment above is correct.
-        if isinstance(board, Board):
-            logging.fatal("TODO(aroetteR): CHECK TO SEE THIS NEVER HAPPENS. Consider deleting")
-            return board.check_winner()
+    def __init__(self, boards: List[Board]):
+        """
+        Initialize a meta-board from a list of Board objects.
+        
+        Args:
+            boards: List of 9 Board objects representing the game state
+        """
+        if len(boards) != 9:
+            raise ValueError("MetaBoard must have exactly 9 boards")
             
-        # Handle list representation
-        return Board.check_winner_from_list(board)
+        # Compute the state from the boards
+        self._state = ["" for _ in range(9)]
+        for i, board in enumerate(boards):
+            winner = board.check_winner()
+            if winner:
+                self._state[i] = winner
+            elif board.is_full():
+                self._state[i] = "T"
     
-    @staticmethod
-    def is_board_full(board: Union[List[str], Board]) -> bool:
-        """Check if a board or meta-board is full."""
-        if isinstance(board, Board):
-            return board.is_full()
-            
-        # For meta-board, check if all positions are filled (not empty)
-        return "" not in board 
+    def get_winner(self) -> Optional[str]:
+        """Return 'X', 'O' if there's a winner, None otherwise."""
+        return Board.check_winner_from_list(self._state)
+    
+    def is_full(self) -> bool:
+        """Check if meta-board is full (no empty spaces)."""
+        return "" not in self._state
+    
+    def is_board_playable(self, board_index: int) -> bool:
+        """
+        Check if a specific board can be played in.
+        
+        Args:
+            board_index: Index of board to check (0-8)
+        Returns:
+            bool: True if board is empty (not won/tied)
+        """
+        if not 0 <= board_index <= 8:
+            raise ValueError("Board index must be between 0 and 8")
+        return self._state[board_index] == ""
+    
+    def to_list(self) -> List[str]:
+        """Return list representation for API responses."""
+        return self._state.copy()
+    
+    def to_json(self) -> str:
+        """Return JSON string representation for database storage."""
+        return json.dumps(self._state)
+    
+    def __str__(self) -> str:
+        """Human-readable string representation."""
+        return f"MetaBoard({self._state})"
