@@ -70,7 +70,6 @@ def completed_game(sample_players):
     """Create a completed game with a winner."""
     # Create a game where X wins by taking the center column of the meta board
     boards = [[""]*9 for _ in range(9)]
-    meta_board = ["" for _ in range(9)]
     
     # Set up winning condition in boards 1, 4, 7 (center column)
     for board_idx in [1, 4, 7]:
@@ -78,7 +77,6 @@ def completed_game(sample_players):
         boards[board_idx][0] = "X"
         boards[board_idx][4] = "X"
         boards[board_idx][8] = "X"
-        meta_board[board_idx] = "X"
     
     game = Game.create(
         player_x=sample_players[0],
@@ -86,7 +84,6 @@ def completed_game(sample_players):
         current_player="O",  # Last move was by X
         game_over=True,
         winner="X",
-        meta_board=json.dumps(meta_board),
         boards=json.dumps(boards),
         completed_at=datetime.datetime.now()
     )

@@ -3,7 +3,8 @@ import json
 import shortuuid
 from peewee import *
 from db_config import DB_PATH
-from backend.board_logic import MetaBoard
+from backend.board_logic import MetaBoard, Board
+from typing import List
 
 # Initialize database
 db = SqliteDatabase(DB_PATH)
@@ -78,8 +79,7 @@ class Game(BaseModel):
     player_x_elo_change = IntegerField(null=True)  # ELO change for player X
     player_o_elo_change = IntegerField(null=True)  # ELO change for player O
     
-    # JSON fields
-    meta_board = TextField(default=json.dumps(["" for _ in range(9)]))
+    # JSON fields - meta_board is now computed dynamically from boards
     boards = TextField(default=json.dumps([[""]*9 for _ in range(9)]))
 
     def save(self, *args, **kwargs):
@@ -107,17 +107,32 @@ class Game(BaseModel):
         self.save()  # Save the updated time
         return self.get_time_remaining(self.current_player)
     
+    def get_boards(self) -> List[Board]:
+        """Get the list of Board objects."""
+        boards_data = json.loads(self.boards)
+        return [Board(squares) for squares in boards_data]
+    
+    def set_boards(self, boards: List[Board]) -> None:
+        """Save the list of Board objects."""
+        self.boards = json.dumps([board.to_list() for board in boards])
+    
+    def get_meta_board(self) -> MetaBoard:
+        """Get the current meta board state."""
+        return MetaBoard(self.get_boards())
+    
     def to_dict(self):
         """Convert model to dictionary for API response."""
+        meta = self.get_meta_board()
+        boards = self.get_boards()
+        
         # Get player ELO ratings if available
         player_x_elo = self.player_x.elo if self.player_x else None
         player_o_elo = self.player_o.elo if self.player_o else None
         
-        meta = MetaBoard(self.meta_board)
         return {
-            'id': self.id,  
+            'id': self.id,
             'meta_board': meta.to_list(),
-            'boards': json.loads(self.boards),
+            'boards': [board.to_list() for board in boards],
             'current_player': self.current_player,
             'next_board': self.next_board,
             'winner': self.winner,

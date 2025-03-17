@@ -72,7 +72,7 @@ class GamePlayerInfo(BaseModel):
 
 class GameResponse(BaseModel):
     id: str
-    meta_board: List[str]
+    meta_board: List[str]  # Computed dynamically from boards state
     boards: List[List[str]]
     current_player: str
     next_board: Optional[int]

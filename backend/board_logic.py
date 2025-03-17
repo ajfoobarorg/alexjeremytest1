@@ -53,28 +53,28 @@ class MetaBoard:
     """
     Represents the meta-board in Ultimate Tic-Tac-Toe, tracking the state of the 9 larger boards.
     Each position can be empty (""), won by a player ("X"/"O"), or tied ("T").
+    This is a read-only view computed from the actual board states.
     """
     
-    def __init__(self, state: Optional[Union[str, List[str]]] = None):
+    def __init__(self, boards: List[Board]):
         """
-        Initialize a meta-board with either a JSON string, List[str], or empty state.
+        Initialize a meta-board from a list of Board objects.
         
         Args:
-            state: Optional initial state. Can be JSON string or List[str].
-                  If None, creates an empty board.
+            boards: List of 9 Board objects representing the game state
         """
-        if state is None:
-            self._state = ["" for _ in range(9)]
-        elif isinstance(state, str):
-            self._state = json.loads(state)
-        else:
-            self._state = list(state)  # Create a copy to prevent external modification
+        if len(boards) != 9:
+            raise ValueError("MetaBoard must have exactly 9 boards")
             
-        if len(self._state) != 9:
-            raise ValueError("MetaBoard must have exactly 9 positions")
-        if not all(pos in ["", "X", "O", "T"] for pos in self._state):
-            raise ValueError("Invalid board position value")
-
+        # Compute the state from the boards
+        self._state = ["" for _ in range(9)]
+        for i, board in enumerate(boards):
+            winner = board.check_winner()
+            if winner:
+                self._state[i] = winner
+            elif board.is_full():
+                self._state[i] = "T"
+    
     def get_winner(self) -> Optional[str]:
         """Return 'X', 'O' if there's a winner, None otherwise."""
         return Board.check_winner_from_list(self._state)
@@ -95,22 +95,6 @@ class MetaBoard:
         if not 0 <= board_index <= 8:
             raise ValueError("Board index must be between 0 and 8")
         return self._state[board_index] == ""
-    
-    def mark_board(self, board_index: int, result: str) -> None:
-        """
-        Mark a board as won by a player or tied.
-        
-        Args:
-            board_index: Index of board to mark (0-8)
-            result: "X"/"O" for winner, "T" for tie
-        """
-        if not 0 <= board_index <= 8:
-            raise ValueError("Board index must be between 0 and 8")
-        if result not in ["X", "O", "T"]:
-            raise ValueError("Result must be 'X', 'O', or 'T'")
-        if not self.is_board_playable(board_index):
-            raise ValueError("Board is already marked")
-        self._state[board_index] = result
     
     def to_list(self) -> List[str]:
         """Return list representation for API responses."""

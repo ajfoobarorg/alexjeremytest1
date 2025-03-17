@@ -256,34 +256,27 @@ class GameService:
             if game.next_board is not None and game.next_board != board_index:
                 return None, "Must play in the indicated board"
             
-            # Get boards from JSON
-            boards = json.loads(game.boards)
-            meta = MetaBoard(game.meta_board)
+            # Get boards as proper Board objects
+            boards = game.get_boards()
+            
+            # Get meta state as proper MetaBoard object
+            meta = game.get_meta_board()
             
             # Verify the move is valid
             if not meta.is_board_playable(board_index):
                 return None, "Board already completed"
                 
-            if boards[board_index][position] != "":
+            if boards[board_index].get(position) != "":
                 return None, "Position already taken"
             
             # Make the move
-            boards[board_index][position] = game.current_player
+            boards[board_index].set(position, game.current_player)
             
-            # Check if the small board was won
-            board = Board(boards[board_index])
-            board_winner = board.check_winner()
-            if board_winner:
-                meta.mark_board(board_index, board_winner)
-            # Check if the small board is full (tie)
-            elif board.is_full():
-                meta.mark_board(board_index, "T")
+            # Save boards
+            game.set_boards(boards)
             
-            # Update game state
-            game.boards = json.dumps(boards)
-            game.meta_board = meta.to_json()
-            
-            # Check if the move resulted in a win on the meta board
+            # Check for winner using new meta state
+            meta = game.get_meta_board()  # Recompute after move
             meta_winner = meta.get_winner()
             if meta_winner:
                 game.winner = meta_winner
@@ -318,7 +311,7 @@ class GameService:
                 
                 return game, None
                 
-            # Check if the meta board is full (draw)
+            # Check for draw
             if meta.is_full():
                 game.game_over = True
                 game.save()
@@ -339,8 +332,7 @@ class GameService:
                 
                 return game, None
             
-            # Set next board based on the position played
-            # If the target board is completed, player can choose any incomplete board
+            # Set next board
             if not meta.is_board_playable(position):
                 game.next_board = None
             else:
