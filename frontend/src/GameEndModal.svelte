@@ -11,6 +11,7 @@
   export let playerName;
   export let stats;
   export let eloChange;
+  export let oldElo;
   
   let confetti;
   
@@ -88,15 +89,10 @@
 
     <div class="elo-container">
       <div class="elo-change {eloChange > 0 ? 'positive' : eloChange < 0 ? 'negative' : 'neutral'}">
-        <span class="elo-label">ELO Rating Change:</span>
+        <span class="elo-label">ELO Rating:</span>
         <span class="elo-value">
-          {eloChange > 0 ? '+' : ''}{eloChange}
+          {oldElo} → {stats.elo}
         </span>
-      </div>
-      
-      <div class="elo-rating">
-        <span class="elo-label">Current Rating:</span>
-        <span class="elo-current">{stats.elo}</span>
       </div>
     </div>
 
@@ -194,18 +190,6 @@
     border: 2px solid #1565c0;
   }
 
-  .elo-rating {
-    background: #f5f5f5;
-    padding: 1.5rem;
-    border-radius: 8px;
-    width: 100%;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    border: 2px solid #424242;
-  }
-
   .elo-label {
     font-weight: bold;
     margin-bottom: 0.5rem;
@@ -224,12 +208,6 @@
 
   .elo-value.negative {
     color: #c62828;
-  }
-
-  .elo-current {
-    font-size: 2.5rem;
-    font-weight: bold;
-    color: #424242;
   }
 
   .button-container {
@@ -285,7 +263,7 @@
       margin-bottom: 1rem;
     }
 
-    .elo-value, .elo-current {
+    .elo-value {
       font-size: 2rem;
     }
 
@@ -308,7 +286,7 @@
       font-size: 1.3rem;
     }
 
-    .elo-value, .elo-current {
+    .elo-value {
       font-size: 1.8rem;
     }
   }
