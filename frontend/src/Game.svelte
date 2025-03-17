@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { playerId, authLoading } from './stores.js';
+  import { playerId, authLoading, myPlayerData } from './stores.js';
   import { navigate } from './router.js';
   import GameEndModal from './GameEndModal.svelte';
   import { API_BASE_URL } from './config.js';
@@ -18,10 +18,11 @@
   let showStartGameModal = true;  // Start true since we always show it at game start
   let isLoading = true;
   let showResignConfirm = false;
+  let gameReady = false;  // Track if game has been marked as ready
   
   // Player information
   let playerSymbol = null;
-  let player = null;  // Only used for post-game ELO updates
+  let opponentInfo = null;  // Only need to store opponent info
 
   // Timing variables
   let displayedXTimeRemaining = null;
@@ -31,66 +32,48 @@
   let pollInterval;
   let timeUpdateInterval;
   let lastPlayer = null;  // Track the last player to detect changes
+  let lastTurnStartTime = null;  // Track when the current turn started
 
   // Track if we're currently handling a game end
   let handlingGameEnd = false;
-  // Store the ELO change to display in the modal
-  let eloChange = null;
-
+  
   // Computed values from game state
   $: gameUrl = game ? window.location.origin + `/game/${game.id}` : window.location.href;
   $: playerX = game?.player_x?.id;
   $: playerO = game?.player_o?.id;
   $: isMyTurn = game?.current_player === 'X' ? playerX === $playerId : playerO === $playerId;
   $: timeRemaining = game?.current_player === 'X' ? displayedXTimeRemaining : displayedOTimeRemaining;
-  $: showWarning = isMyTurn && (warningCountdown !== null || (timeRemaining !== null && timeRemaining <= 25)) && !game?.game_over;
+  $: showWarning = isMyTurn && !game?.game_over && (
+    (timeRemaining !== null && timeRemaining <= 25) || // Low total time warning
+    warningCountdown !== null // Inactivity warning
+  );
   $: gameStarted = !showStartGameModal;  // Game has started when start modal is dismissed
+  $: amIWinner = game?.winner ? (game.winner === playerSymbol) : false;
 
-  
-  // Function to handle game end
-  async function handleGameEnd() {
-    if (handlingGameEnd) return;
-    handlingGameEnd = true;
-    
+  async function fetchPlayerInfo(playerId) {
     try {
-      // Store the ELO change before fetching updated player data
-      eloChange = playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change;
-      showGameEndModal = true;
-    } finally {
-      handlingGameEnd = false;
+      const response = await fetch(`${API_BASE_URL}/profile/${playerId}`);
+      if (!response.ok) {
+        console.error('Failed to fetch player info');
+        return null;
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching player info:', error);
+      return null;
     }
   }
 
-  $: if (game?.game_over && !showGameEndModal && !gameEndModalDismissed && isMyTurn && !handlingGameEnd) {
-    handleGameEnd();
-  }
-
-  function updateDisplayTimes() {
-    if (game?.game_over) return;
+  async function updatePlayerInfo() {
+    if (!game) return;
     
-    // Only decrement time if the game has started (modal dismissed)
-    if (!showStartGameModal) {
-      // Only decrement time for the current player
-      if (game.current_player === 'X') {
-        displayedXTimeRemaining = Math.max(0, displayedXTimeRemaining - 1);
-      } else {
-        displayedOTimeRemaining = Math.max(0, displayedOTimeRemaining - 1);
-      }
-      
-      // Check for warning conditions
-      if (isMyTurn && !warningInterval && timeRemaining <= 25) {
-        startWarningCountdown();
-      }
-    }
-  }
-
-  function updateTimesFromServer(xTime, oTime) {
-    // Only update times if the current player has changed
-    if (game?.current_player !== lastPlayer) {
-      displayedXTimeRemaining = xTime;
-      displayedOTimeRemaining = oTime;
-      lastPlayer = game?.current_player;
-    }
+    // Determine opponent's ID
+    const opponentId = playerSymbol === 'X' ? game.player_o.id : game.player_x.id;
+    
+    // Only fetch opponent info
+    const oppInfo = await fetchPlayerInfo(opponentId);
+    console.log("Opponenet info fetched:", oppInfo);
+    opponentInfo = oppInfo;
   }
 
   async function fetchGameState() {
@@ -117,6 +100,9 @@
           navigate('/');
           return;
         }
+        
+        // Fetch player info on first load
+        await updatePlayerInfo();
       }
       
       // Update times
@@ -124,6 +110,94 @@
     } catch (error) {
       console.error('Error fetching game state:', error);
       navigate('/');
+    }
+  }
+
+  // Function to handle game end
+  async function handleGameEnd() {
+    if (handlingGameEnd) return;
+    handlingGameEnd = true;
+    
+    try {
+      showGameEndModal = true;
+    } finally {
+      handlingGameEnd = false;
+    }
+  }
+
+  // Show game end modal when game is over and we haven't dismissed it
+  $: if (game?.game_over && !showGameEndModal && !gameEndModalDismissed && !handlingGameEnd) {
+    handleGameEnd();
+  }
+
+  function updateDisplayTimes() {
+    if (game?.game_over || !game?.started || showStartGameModal) {
+      return;
+    }
+    
+    // Decrement time for current player
+    if (game.current_player === 'X') {
+      displayedXTimeRemaining = Math.max(0, displayedXTimeRemaining - 1);
+    } else if (game.current_player === 'O') {
+      displayedOTimeRemaining = Math.max(0, displayedOTimeRemaining - 1);
+    }
+    
+    // Start inactivity warning if it's been 10 seconds since turn started
+    if (isMyTurn && !warningInterval && lastTurnStartTime && (Date.now() - lastTurnStartTime) >= 10000) {
+      console.log('Starting warning countdown due to inactivity:', {
+        now: Date.now(),
+        lastTurnStartTime,
+        diff: Date.now() - lastTurnStartTime
+      });
+      startWarningCountdown();
+    }
+  }
+
+  function updateTimesFromServer(xTime, oTime) {
+    // Always update initial times if they're null
+    if (displayedXTimeRemaining === null || displayedOTimeRemaining === null) {
+      console.log('Initializing times from server:', { xTime, oTime });
+      displayedXTimeRemaining = xTime;
+      displayedOTimeRemaining = oTime;
+      lastPlayer = game?.current_player;
+      
+      // Initialize turn start time if it's our turn and game has started
+      if (isMyTurn && game?.started && !showStartGameModal) {
+        console.log('Setting initial lastTurnStartTime');
+        lastTurnStartTime = Date.now();
+      }
+      return;
+    }
+
+    // Update times if the current player has changed
+    if (game?.current_player !== lastPlayer) {
+      console.log('Turn changed:', {
+        from: lastPlayer,
+        to: game?.current_player,
+        xTime,
+        oTime,
+        started: game?.started,
+        showStartModal: showStartGameModal,
+        isMyTurn
+      });
+      displayedXTimeRemaining = xTime;
+      displayedOTimeRemaining = oTime;
+      lastPlayer = game?.current_player;
+      
+      // Reset and update turn start time if it's my turn and game has started
+      if (isMyTurn && game?.started && !showStartGameModal) {
+        console.log('Setting lastTurnStartTime on turn change');
+        lastTurnStartTime = Date.now();
+        stopWarningCountdown();  // Clear any existing warning
+      } else {
+        console.log('Clearing lastTurnStartTime (not my turn)');
+        lastTurnStartTime = null; // Clear the turn start time when it's not our turn
+        stopWarningCountdown();  // Make sure to clear any existing warning
+      }
+    } else if (isMyTurn && game?.started && !showStartGameModal && !lastTurnStartTime) {
+      // Handle case where it's still our turn but lastTurnStartTime was cleared
+      console.log('Resetting lastTurnStartTime for current turn');
+      lastTurnStartTime = Date.now();
     }
   }
 
@@ -190,7 +264,7 @@
     // Set up polling for game state
     pollInterval = setInterval(fetchGameState, 1000);
     
-    // Set up time updates
+    // Set up time updates - run every second
     timeUpdateInterval = setInterval(updateDisplayTimes, 1000);
     
     // Mark loading as complete
@@ -214,11 +288,13 @@
   });
 
   function startWarningCountdown() {
-    if (!warningInterval && isMyTurn) {
+    if (!warningInterval) {
+      console.log('Starting warning countdown');
       warningCountdown = 10;  // 10 seconds to make a move
       warningInterval = setInterval(() => {
         warningCountdown--;
         if (warningCountdown <= 0) {
+          console.log('Warning countdown reached zero, resigning game');
           resignGame();
           clearInterval(warningInterval);
           warningInterval = null;
@@ -277,17 +353,66 @@
         if (response.ok) {
           const data = await response.json();
           game = data; // Update game state directly
+          gameReady = true; // Mark game as ready to start timers
+          
+          // Initialize times from server and turn start time if it's our turn
+          displayedXTimeRemaining = data.player_x.time_remaining;
+          displayedOTimeRemaining = data.player_o.time_remaining;
+          lastPlayer = data.current_player;
+          console.log('Game started (X):', { 
+            xTime: displayedXTimeRemaining, 
+            oTime: displayedOTimeRemaining,
+            currentPlayer: data.current_player,
+            gameReady,
+            started: data.started
+          });
+          if (isMyTurn) {
+            lastTurnStartTime = Date.now();
+          }
         }
       } catch (error) {
         console.error('Error starting game:', error);
       }
+    } else {
+      // For player O, we need to wait for the game state to show started
+      console.log('Player O waiting for game to start...');
+      const checkGameReady = setInterval(async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/games/${gameId}`);
+          if (response.ok) {
+            const data = await response.json();
+
+            
+            if (data.started) {
+              clearInterval(checkGameReady);
+              game = data;
+              gameReady = true; // Mark game as ready to start timers
+              
+              // Initialize times from server and turn start time if it's our turn
+              displayedXTimeRemaining = data.player_x.time_remaining;
+              displayedOTimeRemaining = data.player_o.time_remaining;
+              lastPlayer = data.current_player;
+              console.log('Game started (O):', { 
+                xTime: displayedXTimeRemaining, 
+                oTime: displayedOTimeRemaining,
+                currentPlayer: data.current_player,
+                gameReady
+              });
+              if (isMyTurn) {
+                lastTurnStartTime = Date.now();
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error checking game ready state:', error);
+        }
+      }, 1000);
     }
   }
 
   function dismissGameEndModal() {
     showGameEndModal = false;
     gameEndModalDismissed = true;
-    eloChange = null; // Reset the stored ELO change
   }
 
 </script>
@@ -320,24 +445,22 @@
     {/if}
   </div>
 
-  <div class="game-header" class:mobile-hidden={gameStarted && !game.game_over}>
-    <h1>{game.name}</h1>
-    
+  <div class="game-header" class:mobile-hidden={gameStarted && !game.game_over}>    
     <div class="players">
       <div class="player player-x">
-        <strong>Player X:</strong> {game.player_x.username}
+        <strong>Player X:</strong> {playerX === $playerId ? $myPlayerData.username : opponentInfo?.username}
         <div class="player-stats">
-          <span>ELO: {game.player_x.elo}</span>
-          <span>Wins: {game.player_x.wins}</span>
-          <span>Win Rate: {calculateWinRate(game.player_x)}%</span>
+          <span>ELO: {playerX === $playerId ? $myPlayerData.stats.elo : opponentInfo?.stats?.elo}</span>
+          <span>Wins: {playerX === $playerId ? $myPlayerData.stats.wins : opponentInfo?.stats?.wins}</span>
+          <span>Win Rate: {calculateWinRate(playerX === $playerId ? $myPlayerData.stats : opponentInfo?.stats)}%</span>
         </div>
       </div>
       <div class="player player-o">
-        <strong>Player O:</strong> {game.player_o.username}
+        <strong>Player O:</strong> {playerO === $playerId ? $myPlayerData.username : opponentInfo?.username}
         <div class="player-stats">
-          <span>ELO: {game.player_o.elo}</span>
-          <span>Wins: {game.player_o.wins}</span>
-          <span>Win Rate: {calculateWinRate(game.player_o)}%</span>
+          <span>ELO: {playerO === $playerId ? $myPlayerData.stats.elo : opponentInfo?.stats?.elo}</span>
+          <span>Wins: {playerO === $playerId ? $myPlayerData.stats.wins : opponentInfo?.stats?.wins}</span>
+          <span>Win Rate: {calculateWinRate(playerO === $playerId ? $myPlayerData.stats : opponentInfo?.stats)}%</span>
         </div>
       </div>
     </div>
@@ -356,7 +479,7 @@
 
     <div class="status">
       {#if game.winner}
-        Winner: {game.winner === 'X' ? game.player_x.username : game.player_o.username}!
+        Winner: {game.winner === 'X' ? $myPlayerData.username : opponentInfo?.username}!
       {:else if game.game_over}
         Game Over - Draw!
       {:else if game.current_player === playerSymbol}
@@ -367,9 +490,19 @@
           - You can play in any available board
         {/if}
       {:else}
-        Waiting for {game.current_player === 'X' ? game.player_x.username : game.player_o.username} to move...
+        Waiting for {game.current_player === 'X' ? $myPlayerData.username : opponentInfo?.username} to move...
       {/if}
     </div>
+
+    {#if showWarning}
+      <div class="time-warning">
+        {#if warningCountdown !== null}
+          Warning: Please make a move in {warningCountdown} seconds or you will forfeit the game!
+        {:else}
+          Warning: You have {timeRemaining} seconds remaining!
+        {/if}
+      </div>
+    {/if}
 
     <div class="super-board {game.winner ? game.winner.toLowerCase() : ''}">
       {#each Array(9) as _, boardIndex}
@@ -392,33 +525,25 @@
         </div>
       {/each}
     </div>
-
-    {#if showWarning}
-      <div class="time-warning">
-        {#if warningCountdown !== null}
-          Warning: Please make a move in {warningCountdown} seconds or you will forfeit the game
-        {/if}
-      </div>
-    {/if}
   </div>
 
   {#if showStartGameModal}
     <StartGameModal
-      playerXName={game.player_x.username}
-      playerOName={game.player_o.username}
-      playerXStats={game.player_x}
-      playerOStats={game.player_o}
+      playerXName={playerX === $playerId ? $myPlayerData.username : opponentInfo?.username}
+      playerOName={playerO === $playerId ? $myPlayerData.username : opponentInfo?.username}
+      playerXStats={playerX === $playerId ? $myPlayerData.stats : opponentInfo?.stats}
+      playerOStats={playerO === $playerId ? $myPlayerData.stats : opponentInfo?.stats}
       on:start={handleGameStart}
     />
   {/if}
 
   {#if showGameEndModal}
     <GameEndModal
-      isWinner={game.winner === playerSymbol}
+      isWinner={amIWinner}
       isDraw={game.game_over && !game.winner}
-      playerName={player.username}
-      stats={player}
-      eloChange={eloChange !== null ? eloChange : (playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change)}
+      playerName={$myPlayerData.username}
+      stats={$myPlayerData.stats}
+      eloChange={playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change}
       on:dismiss={dismissGameEndModal}
     />
   {/if}
@@ -710,9 +835,15 @@
   }
 
   .time-warning {
-    color: red;
+    color: #d32f2f;
     font-weight: bold;
     animation: pulse 1s infinite;
+    background: #ffebee;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    border: 2px solid #d32f2f;
+    margin: 1rem 0;
+    text-align: center;
   }
 
   .loading {

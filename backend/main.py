@@ -41,7 +41,7 @@ def set_player_id_cookie(response: Response, player_id: str) -> None:
         value=player_id,
         max_age=365 * 24 * 60 * 60,  # 1 year
         httponly=True,
-        samesite="none",
+        samesite="none" if config.IS_PRODUCTION else "lax",
         secure=config.IS_PRODUCTION,  # Only set secure in production
         path="/",
         domain=config.BACKEND_DOMAIN  # Set to backend domain explicitly
@@ -83,7 +83,7 @@ def logout(response: Response):
     response.delete_cookie(
         key="playerId",
         httponly=True,
-        samesite="none",
+        samesite="none" if config.IS_PRODUCTION else "lax",
         path="/",
         secure=config.IS_PRODUCTION,
         domain=config.BACKEND_DOMAIN
@@ -251,6 +251,7 @@ def ready_game(game_id: str, player_id: str) -> GameResponse:
     
     # Start the game by setting the initial last_move_time
     game.last_move_time = datetime.datetime.now()
+    game.started = True
     game.save()
     
     return GameResponse(**game.to_dict()) 
