@@ -17,15 +17,13 @@ def convert_datetime(s: bytes) -> datetime:
 sqlite3.register_adapter(datetime, adapt_datetime)
 sqlite3.register_converter("datetime", convert_datetime)
 
-# Environment setup
-ENVIRONMENT = os.getenv('ENVIRONMENT', 'DEVELOPMENT')
-logger.info(f"Running in {ENVIRONMENT} environment")
-
-if ENVIRONMENT == 'DEVELOPMENT':
-    DB_PATH = os.path.join(os.path.dirname(__file__), 'tictactoe.db')
+# Set database path
+if config.IS_PRODUCTION:
+    DB_PATH = "/var/data/tictactoe.db"
 else:
-    DB_PATH = os.path.join(os.path.dirname(__file__), 'prod_tictactoe.db')
+    DB_PATH = os.path.join(os.path.dirname(__file__), "tictactoe.db")
 
+logger.info(f"Running in {'PRODUCTION' if config.IS_PRODUCTION else 'DEVELOPMENT'} environment")
 logger.info(f"Using database at: {DB_PATH}")
 
 # Make sure the directory exists in production
