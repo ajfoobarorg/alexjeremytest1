@@ -3,7 +3,6 @@
   import { onMount } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import { navigate } from './router.js';
-  import { fade } from 'svelte/transition';
   
   const dispatch = createEventDispatcher();
   
@@ -12,7 +11,6 @@
   export let playerName;
   export let stats;
   export let eloChange;
-  export let oldElo;
   
   let confetti;
   
@@ -76,48 +74,39 @@
 </script>
 
 <div class="modal-backdrop" on:click={handleClose}>
-  <div class="modal" on:click|stopPropagation transition:fade>
-    <div class="modal-content">
-      <h2>{isWinner ? 'Congratulations!' : isDraw ? 'Game Over!' : 'Better luck next time!'}</h2>
-      <p>{playerName}</p>
-      
-      <div class="stats">
-        <div class="stat">
-          <span class="label">ELO:</span>
-          <div class="elo-container">
-            <div class="elo-change {eloChange > 0 ? 'positive' : eloChange < 0 ? 'negative' : 'neutral'}">
-              <span class="elo-label">ELO Rating:</span>
-              <span class="elo-value">
-                {oldElo} → {oldElo + eloChange}
-              </span>
-              <span class="elo-change-value">
-                {eloChange > 0 ? '+' : ''}{eloChange}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div class="stat">
-          <span class="label">Wins:</span>
-          <span class="value">{stats.wins}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Losses:</span>
-          <span class="value">{stats.losses}</span>
-        </div>
-        <div class="stat">
-          <span class="label">Draws:</span>
-          <span class="value">{stats.draws}</span>
-        </div>
+  <div class="modal" on:click|stopPropagation>
+    {#if isWinner}
+      <h2>🎉 Congratulations, {playerName}! 🎉</h2>
+      <p class="message">You've won the game!</p>
+    {:else if isDraw}
+      <h2>Game Over - It's a Draw!</h2>
+      <p class="message">Well played by both players!</p>
+    {:else}
+      <h2>Good Game, {playerName}!</h2>
+      <p class="message">You played well!</p>
+    {/if}
+
+    <div class="elo-container">
+      <div class="elo-change {eloChange > 0 ? 'positive' : eloChange < 0 ? 'negative' : 'neutral'}">
+        <span class="elo-label">ELO Rating Change:</span>
+        <span class="elo-value">
+          {eloChange > 0 ? '+' : ''}{eloChange}
+        </span>
       </div>
       
-      <div class="button-container">
-        <button class="dismiss-button" on:click={handleClose}>
-          Close
-        </button>
-        <button class="home-button" on:click={goToHome}>
-          Back to Home
-        </button>
+      <div class="elo-rating">
+        <span class="elo-label">Current Rating:</span>
+        <span class="elo-current">{stats.elo}</span>
       </div>
+    </div>
+
+    <div class="button-container">
+      <button class="dismiss-button" on:click={handleClose}>
+        Close
+      </button>
+      <button class="home-button" on:click={goToHome}>
+        Back to Home
+      </button>
     </div>
   </div>
 </div>
@@ -164,47 +153,83 @@
     margin: 0 0 1rem 0;
   }
 
-  p {
-    margin: 0 0 1.5rem 0;
+  .message {
     font-size: 1.2rem;
+    margin-bottom: 1.5rem;
     color: #424242;
   }
 
-  .stats {
+  .elo-container {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 1rem;
     margin-bottom: 1.5rem;
   }
 
-  .stat {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem;
+  .elo-change {
     background: #f5f5f5;
-    border-radius: 4px;
+    padding: 1.5rem;
+    border-radius: 8px;
+    width: 100%;
+    text-align: center;
+    font-size: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 
-  .label {
+  .elo-change.positive {
+    background: #e8f5e9;
+    border: 2px solid #2e7d32;
+  }
+
+  .elo-change.negative {
+    background: #ffebee;
+    border: 2px solid #c62828;
+  }
+
+  .elo-change.neutral {
+    background: #e3f2fd;
+    border: 2px solid #1565c0;
+  }
+
+  .elo-rating {
+    background: #f5f5f5;
+    padding: 1.5rem;
+    border-radius: 8px;
+    width: 100%;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border: 2px solid #424242;
+  }
+
+  .elo-label {
     font-weight: bold;
-    color: #666;
+    margin-bottom: 0.5rem;
+    color: #424242;
   }
 
-  .value {
-    color: #333;
-  }
-
-  .change {
+  .elo-value {
+    font-size: 2.5rem;
     font-weight: bold;
+    margin-bottom: 0.5rem;
   }
 
-  .change.positive {
-    color: #4CAF50;
+  .elo-value.positive {
+    color: #2e7d32;
   }
 
-  .change.negative {
-    color: #f44336;
+  .elo-value.negative {
+    color: #c62828;
+  }
+
+  .elo-current {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #424242;
   }
 
   .button-container {
@@ -255,12 +280,12 @@
       font-size: 1.5rem;
     }
 
-    p {
+    .message {
       font-size: 1rem;
       margin-bottom: 1rem;
     }
 
-    .value, .value.positive, .value.negative {
+    .elo-value, .elo-current {
       font-size: 2rem;
     }
 
@@ -283,22 +308,8 @@
       font-size: 1.3rem;
     }
 
-    .value, .value.positive, .value.negative {
+    .elo-value, .elo-current {
       font-size: 1.8rem;
     }
-  }
-
-  .elo-change-value {
-    font-size: 1.5rem;
-    font-weight: bold;
-    margin-top: 0.5rem;
-  }
-
-  .elo-change-value.positive {
-    color: #2e7d32;
-  }
-
-  .elo-change-value.negative {
-    color: #c62828;
   }
 </style> 
