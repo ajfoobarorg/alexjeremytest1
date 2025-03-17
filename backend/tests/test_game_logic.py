@@ -5,8 +5,6 @@ from freezegun import freeze_time
 from services import GameService
 from models import Game, Player
 
-#TODO(aroetter): pytest genreates 104 warnings, lets fix.
-
 @pytest.mark.game_logic
 class TestGameLogic:
     @staticmethod
