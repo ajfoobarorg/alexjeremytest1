@@ -5,9 +5,13 @@ from peewee import *
 from db_config import DB_PATH
 from backend.board_logic import MetaBoard, Board
 from typing import List
+import sqlite3
 
-# Initialize database
-db = SqliteDatabase(DB_PATH)
+# Initialize database with datetime adapter
+db = SqliteDatabase(DB_PATH, pragmas={
+    'foreign_keys': 1,  # Enable foreign key support
+    'journal_mode': 'wal'  # Write-Ahead Logging for better concurrency
+}, detect_types=sqlite3.PARSE_DECLTYPES)  # Enable datetime type detection
 
 class BaseModel(Model):
     class Meta:

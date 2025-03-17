@@ -148,4 +148,45 @@ class TestGameLogic:
         # Check meta board state through the proper interface
         meta = game.get_meta_board()
         meta_state = meta.to_list()
-        assert meta_state[0] == meta_state[1] == meta_state[2] == "X" 
+        assert meta_state[0] == meta_state[1] == meta_state[2] == "X"
+
+    def test_board_and_game_ties(self, sample_players):
+        """Test that boards and games can end in ties and are properly reflected in meta board."""
+        boards = [[""]*9 for _ in range(9)]
+        
+        # Set up a tied board (board 0)
+        boards[0] = ["X", "O", "X",
+                    "X", "O", "O",
+                    "O", "X", "X"]  # Tied board
+        
+        # Set up a board that will be tied next (board 1)
+        boards[1] = ["X", "O", "X",
+                    "X", "O", "O",
+                    "O", "X", ""]  # One move from tie
+        
+        active_game = Game.create(
+            player_x=sample_players[0],
+            player_o=sample_players[1],
+            current_player="X",
+            next_board=1,
+            boards=json.dumps(boards)
+        )
+        
+        # Check that completed tied board shows as 'T'
+        meta = active_game.get_meta_board()
+        meta_state = meta.to_list()
+        assert meta_state[0] == "T"  # First board should be marked as tied
+        
+        # Complete the second board to a tie
+        game, _ = GameService.make_move(
+            active_game.id,
+            board_index=1,
+            position=8,
+            player_id=sample_players[0].id
+        )
+        
+        # Verify the second board is now also marked as tied
+        meta = game.get_meta_board()
+        meta_state = meta.to_list()
+        assert meta_state[1] == "T"  # Second board should now be tied
+        assert meta_state.count("T") == 2  # Should have two tied boards 

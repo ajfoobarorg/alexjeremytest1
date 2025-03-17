@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 from typing import List, Optional
 from enum import Enum
 import zoneinfo
@@ -23,14 +23,16 @@ class SignupRequest(BaseModel):
     timezone: Optional[str] = None
     country: Optional[str] = None
 
-    @validator('timezone')
-    def validate_timezone(cls, v):
+    @field_validator('timezone')
+    @classmethod
+    def validate_timezone(cls, v: str | None) -> str | None:
         if v is not None and v not in VALID_TIMEZONES:
             raise ValueError('Invalid timezone. Must be a valid IANA timezone name.')
         return v
 
-    @validator('country')
-    def validate_country(cls, v):
+    @field_validator('country')
+    @classmethod
+    def validate_country(cls, v: str | None) -> str | None:
         if v is not None:
             country = pycountry.countries.get(alpha_2=v.upper())
             if not country:
@@ -49,16 +51,18 @@ class ProfileUpdateRequest(BaseModel):
     country: str | None = None
     timezone: str | None = None
 
-    @validator('country')
-    def validate_country(cls, v):
+    @field_validator('country')
+    @classmethod
+    def validate_country(cls, v: str | None) -> str | None:
         if v is not None:
             country = pycountry.countries.get(alpha_2=v.upper())
             if not country:
                 raise ValueError('Invalid country code. Must be a valid ISO 3166-1 alpha-2 code.')
         return v.upper() if v else v
 
-    @validator('timezone')
-    def validate_timezone(cls, v):
+    @field_validator('timezone')
+    @classmethod
+    def validate_timezone(cls, v: str | None) -> str | None:
         if v is not None and v not in VALID_TIMEZONES:
             raise ValueError('Invalid timezone. Must be a valid IANA timezone name.')
         return v
