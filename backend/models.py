@@ -3,7 +3,7 @@ import json
 import shortuuid
 from peewee import *
 from db_config import DB_PATH
-from backend.board_logic import MetaBoard, Board
+from board_logic import MetaBoard, Board
 from typing import List
 import sqlite3
 
@@ -127,6 +127,8 @@ class Game(BaseModel):
     
     def to_dict(self):
         """Convert model to dictionary for API response."""
+        meta = self.get_meta_board()
+        boards = self.get_boards()
         return {
             'id': self.id,
             'meta_board': meta.to_list(),
