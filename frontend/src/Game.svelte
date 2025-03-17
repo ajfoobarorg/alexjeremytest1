@@ -137,6 +137,18 @@
     handlingGameEnd = true;
     
     try {
+      // Update player stats in store to reflect new ELO
+      if ($myPlayerData && game) {
+        const eloChange = playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change;
+        $myPlayerData = {
+          ...$myPlayerData,
+          stats: {
+            ...$myPlayerData.stats,
+            elo: $myPlayerData.stats.elo + eloChange
+          }
+        };
+      }
+      
       showGameEndModal = true;
     } finally {
       handlingGameEnd = false;
@@ -557,12 +569,14 @@
   {/if}
 
   {#if showGameEndModal}
+    {@const eloChange = playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change}
     <GameEndModal
       isWinner={amIWinner}
       isDraw={game.game_over && !game.winner}
       playerName={$myPlayerData.username}
       stats={$myPlayerData.stats}
-      eloChange={playerSymbol === 'X' ? game.player_x.elo_change : game.player_o.elo_change}
+      eloChange={eloChange}
+      oldElo={$myPlayerData.stats.elo - eloChange}
       on:dismiss={dismissGameEndModal}
     />
   {/if}
