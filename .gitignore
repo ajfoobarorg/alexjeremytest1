@@ -173,3 +173,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# SQLLite stuff
+*.db-shm
+*.db-wal
