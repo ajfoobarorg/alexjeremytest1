@@ -16,6 +16,10 @@ class Config:
     FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
     logger.info(f"FRONTEND_URL set to: {FRONTEND_URL}")
     
+    # Get backend domain for cookie setting
+    BACKEND_DOMAIN = os.environ.get("BACKEND_DOMAIN", "localhost" if not IS_PRODUCTION else None)
+    logger.info(f"BACKEND_DOMAIN set to: {BACKEND_DOMAIN}")
+    
     # Allow the frontend URL and localhost for development
     ALLOWED_ORIGINS: List[str] = [
         FRONTEND_URL,

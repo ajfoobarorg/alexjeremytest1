@@ -1,0 +1,46 @@
+name: Backend Tests
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run tests
+      run: |
+        pytest --cov=. --cov-report=xml
+ 
+# Requires a code coverage account, saving the secret for that account to github, etc
+# For now, just comment all this out, we can add in code coverage later   
+#    - name: Upload coverage to Codecov
+#      uses: codecov/codecov-action@v4
+#      with:
+#        file: ./backend/coverage.xml
+#        flags: backend
+#        name: backend-python
+#        fail_ci_if_error: true 
