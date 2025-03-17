@@ -211,6 +211,29 @@ class GameService:
         try:
             game = Game.get(Game.id == game_id)
             
+            #TODO(aroetter): remove following code when done testing the UI Modal.
+            # TEMPORARY: Force win after first move for testing
+            if game.current_player == 'X':  # First player always wins
+                game.winner = 'X'
+                game.game_over = True
+                
+                # Update player stats
+                if game.player_x and game.player_o:
+                    PlayerService.update_player_stats(game.player_x.id, 'win')
+                    PlayerService.update_player_stats(game.player_o.id, 'loss')
+                    
+                    # Update ELO ratings
+                    player_x, x_elo_change = PlayerService.update_player_elo(game.player_x.id, game.player_o.id, 'win')
+                    player_o, o_elo_change = PlayerService.update_player_elo(game.player_o.id, game.player_x.id, 'loss')
+                    
+                    # Store ELO changes
+                    game.player_x_elo_change = x_elo_change
+                    game.player_o_elo_change = o_elo_change
+                    game.save()
+                
+                return game, None
+            #TODO(aroetter): end of block of code to remove.
+
             # Verify it's the player's turn
             current_player = game.player_x if game.current_player == 'X' else game.player_o
             if not current_player or current_player.id != player_id:
