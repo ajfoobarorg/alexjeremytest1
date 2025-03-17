@@ -11,6 +11,7 @@
 
   // Game state - single source of truth
   let game = null;
+  let lastMove = null; // Track the last move's position as {boardIndex, position}
   
   // UI state
   let showGameEndModal = false;
@@ -85,6 +86,23 @@
         return;
       }
       const data = await response.json();
+      
+      // If the current player changed, find the last move by comparing board states
+      if (game?.current_player !== data.current_player) {
+        lastMove = null;  // Clear last move highlight
+        // Find what changed in the boards to identify the last move
+        if (game) {
+          for (let boardIndex = 0; boardIndex < 9; boardIndex++) {
+            for (let position = 0; position < 9; position++) {
+              if (game.boards[boardIndex][position] !== data.boards[boardIndex][position]) {
+                lastMove = { boardIndex, position };
+                break;
+              }
+            }
+            if (lastMove) break;
+          }
+        }
+      }
       
       // Store full game data
       game = data;
@@ -216,6 +234,7 @@
       });
       const data = await response.json();
       game = data; // Update game state directly
+      lastMove = { boardIndex, position }; // Track this move as the last move
       
       // Update server times
       updateTimesFromServer(data.player_x.time_remaining, data.player_o.time_remaining);
@@ -497,9 +516,9 @@
     {#if showWarning}
       <div class="time-warning">
         {#if warningCountdown !== null}
-          Warning: Please make a move in {warningCountdown} seconds or you will forfeit the game!
+          Are you still there? Please make a move or you'll resign in {warningCountdown} seconds...
         {:else}
-          Warning: You have {timeRemaining} seconds remaining!
+          Time is running out: {timeRemaining} seconds remaining...
         {/if}
       </div>
     {/if}
@@ -514,7 +533,7 @@
           {:else}
             {#each game.boards[boardIndex] as cell, position}
               <button 
-                class="cell {cell.toLowerCase()}" 
+                class="cell {cell.toLowerCase()} {lastMove && boardIndex === lastMove.boardIndex && position === lastMove.position ? 'last-move' : ''}" 
                 on:click={() => makeMove(boardIndex, position)}
                 disabled={!isMyTurn || game.current_player !== playerSymbol || cell || !isBoardPlayable(boardIndex)}
               >
@@ -835,13 +854,13 @@
   }
 
   .time-warning {
-    color: #d32f2f;
+    color: #ffffff;
     font-weight: bold;
     animation: pulse 1s infinite;
-    background: #ffebee;
+    background: #e26c0b;
     padding: 0.5rem 1rem;
     border-radius: 4px;
-    border: 2px solid #d32f2f;
+    border: 2px solid #4b240a;
     margin: 1rem 0;
     text-align: center;
   }
@@ -1073,5 +1092,10 @@
     background-color: #E1BEE7;
     cursor: not-allowed;
     opacity: 0.7;
+  }
+
+  .cell.last-move {
+    font-weight: bold;
+    background-color: #ffffe0;
   }
 </style> 
