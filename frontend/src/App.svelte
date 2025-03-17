@@ -39,7 +39,11 @@
 </script>
 
 <Layout currentPath={$currentPath}>
-  <svelte:component this={component} {...componentProps} />
+  {#if component === Game}
+    <svelte:component this={component} gameId={componentProps.gameId} />
+  {:else}
+    <svelte:component this={component} />
+  {/if}
 </Layout>
 
 <style>
