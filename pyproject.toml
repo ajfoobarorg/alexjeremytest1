@@ -1,0 +1,17 @@
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "D",   # pydocstyle
+]
+ignore = []
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"] 

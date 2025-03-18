@@ -1,0 +1,53 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# JavaScript Formatter Rule
+
+This rule configures Prettier for JavaScript and Svelte files in the frontend source directory.
+
+## Purpose
+
+- Ensures consistent code style across JavaScript and Svelte files
+- Eliminates debates over formatting by enforcing standards
+- Makes code more readable and maintainable
+
+## Configuration
+
+```json
+{
+  "language": "javascript",
+  "patterns": [
+    {
+      "files": ["frontend/src/**/*.js", "frontend/src/**/*.svelte"],
+      "rules": {
+        "formatters": {
+          "enabled": true,
+          "prettier": {
+            "printWidth": 100,
+            "tabWidth": 2,
+            "singleQuote": true,
+            "trailingComma": "es5",
+            "semi": true
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+## Prettier Configuration Explanation
+
+- `printWidth: 100` - Lines wrap at 100 characters
+- `tabWidth: 2` - Use 2 spaces for indentation
+- `singleQuote: true` - Use single quotes instead of double quotes
+- `trailingComma: "es5"` - Add trailing commas where valid in ES5
+- `semi: true` - Add semicolons at the end of statements
+
+## Usage Notes
+
+- Applied automatically when `formatOnSave` is enabled
+- Creates consistent style across the entire frontend codebase
+- Eliminates the need for manual formatting 

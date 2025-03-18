@@ -1,0 +1,42 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# JavaScript Linter Rule
+
+This rule configures ESLint for JavaScript and Svelte files in the frontend source directory.
+
+## Purpose
+
+- Identifies potential errors and problematic patterns
+- Enforces best practices for JavaScript code
+- Ensures code quality and consistency
+
+## Configuration
+
+```json
+{
+  "language": "javascript",
+  "patterns": [
+    {
+      "files": ["frontend/src/**/*.js", "frontend/src/**/*.svelte"],
+      "rules": {
+        "linters": {
+          "enabled": true,
+          "eslint": {
+            "enabled": true
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+## Usage Notes
+
+- ESLint provides real-time feedback about code issues
+- Marks potential problems directly in the editor
+- Can be configured to auto-fix certain types of issues
+- Works alongside Prettier for complete code quality control 

@@ -1,0 +1,14 @@
+{
+  "include": [
+    ".cursor/rules/python-formatter.mdc",
+    ".cursor/rules/python-linter.mdc",
+    ".cursor/rules/python-docstrings.mdc",
+    ".cursor/rules/python-imports.mdc",
+    ".cursor/rules/js-formatter.mdc",
+    ".cursor/rules/js-linter.mdc",
+    ".cursor/rules/svelte-structure.mdc",
+    ".cursor/rules/cursor-rules-location.mdc"
+  ],
+  "formatOnSave": true,
+  "description": "Main Cursor configuration file that includes all rule sets"
+} 

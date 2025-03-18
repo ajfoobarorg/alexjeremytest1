@@ -1,0 +1,41 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Python Linter Rule
+
+This rule configures Ruff as the linter for Python files in the backend directory.
+
+## Purpose
+
+- Enforces code quality standards
+- Identifies potential bugs and anti-patterns
+- Ensures consistent code style
+
+## Configuration
+
+```json
+{
+  "language": "python",
+  "patterns": [
+    {
+      "files": ["backend/**/*.py"],
+      "rules": {
+        "linters": {
+          "enabled": true,
+          "ruff": {
+            "enabled": true
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+## Usage Notes
+
+- Ruff is a fast Python linter written in Rust
+- Provides warnings and errors during development
+- Can automatically fix some issues when configured to do so 
