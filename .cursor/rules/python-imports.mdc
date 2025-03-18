@@ -3,4 +3,64 @@ description:
 globs: 
 alwaysApply: false
 ---
- 
+# Python Imports Rule
+
+This rule defines the ordering of imports for Python files in the backend directory.
+
+## Purpose
+
+- Creates a consistent order for imports
+- Makes import sections more readable
+- Groups related imports together logically
+
+## Configuration
+
+```json
+{
+  "language": "python",
+  "patterns": [
+    {
+      "files": ["backend/**/*.py"],
+      "rules": {
+        "imports": {
+          "order": [
+            "standard",
+            "third-party",
+            "fastapi",
+            "local"
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+## Example Import Order
+
+```python
+# Standard library imports
+import os
+import sys
+from datetime import datetime
+
+# Third-party imports
+import numpy as np
+import pandas as pd
+
+# FastAPI imports
+from fastapi import FastAPI, Depends
+from fastapi.responses import JSONResponse
+
+# Local imports
+from .models import User
+from .utils import validate_input
+```
+
+## Usage Notes
+
+- Standard library imports come first
+- Third-party libraries are next
+- FastAPI framework imports follow
+- Local imports from the project come last
+- Consistently ordered imports improve readability 
