@@ -1,1 +1,79 @@
- 
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Svelte Component Structure Rule
+
+This rule defines the structure and organization of Svelte component files.
+
+## Purpose
+
+- Creates a consistent component structure
+- Makes components easier to navigate and understand
+- Ensures style tags are in a consistent position
+
+## Configuration
+
+```json
+{
+  "language": "javascript",
+  "patterns": [
+    {
+      "files": ["frontend/src/**/*.svelte"],
+      "rules": {
+        "svelte": {
+          "component-structure": [
+            "script",
+            "style",
+            "template"
+          ],
+          "style-position": "bottom"
+        }
+      }
+    }
+  ]
+}
+```
+
+## Example Svelte Component Structure
+
+```svelte
+<script>
+  // JavaScript logic goes here
+  export let name;
+  let count = 0;
+  
+  function increment() {
+    count += 1;
+  }
+</script>
+
+<style>
+  /* CSS styles go here */
+  h1 {
+    color: #ff3e00;
+    font-size: 2rem;
+  }
+  
+  button {
+    background: #ff3e00;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+  }
+</style>
+
+<!-- HTML template goes here -->
+<h1>Hello {name}!</h1>
+<p>Current count: {count}</p>
+<button on:click={increment}>Increment</button>
+```
+
+## Usage Notes
+
+- Script section contains all JavaScript logic
+- Style section is placed at the bottom before the template
+- Template (the HTML markup) comes last
+- This ordering is enforced by the component-structure rule 
