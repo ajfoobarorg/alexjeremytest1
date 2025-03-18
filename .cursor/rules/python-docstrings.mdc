@@ -3,4 +3,56 @@ description:
 globs: 
 alwaysApply: false
 ---
- 
+# Python Docstrings Rule
+
+This rule enforces Google-style docstrings for all Python files in the backend directory.
+
+## Purpose
+
+- Ensures all functions, classes, and modules are properly documented
+- Standardizes docstring format across the codebase
+- Makes code more maintainable and understandable
+
+## Configuration
+
+```json
+{
+  "language": "python",
+  "patterns": [
+    {
+      "files": ["backend/**/*.py"],
+      "rules": {
+        "docstrings": {
+          "required": true,
+          "style": "google"
+        }
+      }
+    }
+  ]
+}
+```
+
+## Google Style Example
+
+```python
+def function_with_types_in_docstring(param1, param2):
+    """Example function with Google style docstrings.
+    
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+        
+    Returns:
+        The return value.
+        
+    Raises:
+        ValueError: If parameters are invalid.
+    """
+    return True
+```
+
+## Usage Notes
+
+- Google style is preferred for its readability and structure
+- Required means every module, class, and function should have a docstring
+- Good docstrings improve code quality and developer experience 

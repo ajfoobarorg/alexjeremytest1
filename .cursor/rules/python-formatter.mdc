@@ -3,4 +3,42 @@ description:
 globs: 
 alwaysApply: false
 ---
- 
+# Python Formatter Rule
+
+This rule enforces consistent formatting for Python files in the backend directory using Black and isort.
+
+## Purpose
+
+- Ensures consistent code style across the codebase
+- Maintains a standard line length of 88 characters (Black default)
+- Organizes imports using isort with Black-compatible settings
+
+## Configuration
+
+```json
+{
+  "language": "python",
+  "patterns": [
+    {
+      "files": ["backend/**/*.py"],
+      "rules": {
+        "formatters": {
+          "enabled": true,
+          "black": {
+            "line-length": 88
+          },
+          "isort": {
+            "profile": "black"
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+## Usage Notes
+
+- This rule is applied automatically on save when `formatOnSave` is enabled
+- Black is opinionated and reformats entire files to maintain consistency
+- The isort profile is set to "black" to ensure compatibility between the two formatters 
