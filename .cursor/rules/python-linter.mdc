@@ -3,9 +3,73 @@ description:
 globs: 
 alwaysApply: false
 ---
-# Python Linter Rule
+# Python Linter
 
-This rule configures Ruff as the linter for Python files in the backend directory.
+This rule defines linting guidelines for Python files.
+
+<rule>
+name: python_linter
+description: Python linting standards for this project
+
+filters:
+  - type: file_extension
+    pattern: "\\.py$"
+  - type: event
+    pattern: "file_edit"
+
+actions:
+  - type: suggest
+    message: |
+      Python code should follow these linting rules:
+
+      1. Variable Naming:
+         - Use meaningful variable names
+         - Avoid single-letter variable names except in loops or as mathematical identifiers
+         - Use ALL_CAPS for constants
+
+      2. Type Hints:
+         - Add type hints for function parameters and return values
+         - Import types from `typing` module as needed
+         - Use type hints consistently across the codebase
+
+      3. Error Handling:
+         - Use specific exception types instead of bare `except:`
+         - Include error messages with raised exceptions
+         - Log exceptions appropriately
+
+      4. Code Structure:
+         - Limit function size (ideally under 50 lines)
+         - Limit complexity (prefer fewer logical branches)
+         - Keep indentation levels manageable (ideally under 4 levels)
+
+      5. Other:
+         - Avoid commented-out code
+         - Include appropriate logging
+         - Use f-strings for string formatting
+
+examples:
+  - input: |
+      def connect(url):
+          try:
+              conn = make_connection(url)
+              return conn
+          except:
+              print("Error")
+              return None
+  - output: |
+      def connect(url: str) -> Connection:
+          """Establish a connection to the specified URL."""
+          try:
+              conn = make_connection(url)
+              return conn
+          except ConnectionError as e:
+              logger.error(f"Connection failed: {e}")
+              return None
+
+metadata:
+  priority: medium
+  version: 1.0
+</rule>
 
 ## Purpose
 

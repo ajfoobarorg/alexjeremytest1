@@ -1,0 +1,69 @@
+# Minimum Changes Rule
+
+This rule ensures that changes to code are limited to only what is required by the prompt.
+
+<rule>
+name: minimum_changes
+description: Guidelines to minimize code changes to only what is explicitly requested
+
+filters:
+  - type: file_extension
+    pattern: "\\.(py|js|ts|jsx|tsx|html|css|scss|svelte)$"
+  - type: event
+    pattern: "file_edit"
+
+actions:
+  - type: suggest
+    message: |
+      When modifying code:
+
+      1. Only make changes that are explicitly requested in the prompt
+      2. Respect existing code structure and organization
+      3. Match the style and conventions of the surrounding code
+      4. Avoid introducing new imports or dependencies unless specifically requested
+      5. Do not refactor or reorganize code beyond what is requested
+      6. Do not change working code that is unrelated to the requested changes
+      7. Document your changes with clear comments if complex or non-obvious
+      8. When fixing style, only change the specific issues mentioned in relevant style guides
+      9. Preserve existing functionality and behavior
+      10. If multiple implementation approaches are possible, choose the one with minimal changes
+
+      Remember that the goal is to fulfill the exact requirements, not to improve or extend beyond what was requested.
+
+examples:
+  - input: |
+      # Request: Add error handling to this function
+      def process_data(data):
+          result = data.transform()
+          return result
+    output: |
+      # Good change - only adds the requested error handling
+      def process_data(data):
+          try:
+              result = data.transform()
+              return result
+          except Exception as e:
+              logging.error(f"Error processing data: {e}")
+              return None
+      
+      # Bad change - changes unrelated code and structure
+      def process_data(data):
+          # Complete refactoring with additional parameters and logic
+          if not data:
+              return None
+          try:
+              # Changed the method call completely
+              result = transform_data(data)
+              if validate_result(result):
+                  return result
+              else:
+                  logging.warning("Invalid result")
+                  return None
+          except Exception as e:
+              logging.error(f"Error processing data: {e}")
+              return None
+
+metadata:
+  priority: high
+  version: 1.0
+</rule> 

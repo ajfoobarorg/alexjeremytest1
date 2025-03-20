@@ -3,9 +3,72 @@ description:
 globs: 
 alwaysApply: false
 ---
-# Python Formatter Rule
+# Python Formatter
 
-This rule enforces consistent formatting for Python files in the backend directory using Black and isort.
+This rule defines proper Python formatting guidelines for the project.
+
+<rule>
+name: python_formatter
+description: Python code formatting standards for this project
+
+filters:
+  - type: file_extension
+    pattern: "\\.py$"
+  - type: event
+    pattern: "file_edit"
+
+actions:
+  - type: suggest
+    message: |
+      Python code must follow these formatting rules:
+
+      1. Use 4 spaces for indentation (no tabs)
+      2. Maximum line length is 88 characters (Black default)
+      3. Surround top-level functions and classes with two blank lines
+      4. Use single blank lines within functions to separate logical sections
+      5. No trailing whitespace
+      6. Use spaces around operators and after commas
+      7. End all files with a single newline
+      8. Follow PEP 8 naming conventions:
+         - Class names: CamelCase
+         - Function names: snake_case
+         - Variable names: snake_case
+         - Constants: UPPER_CASE_WITH_UNDERSCORES
+
+      For conditional expressions and keyword arguments:
+      ```python
+      # Good
+      if x == 4:
+          print(x)
+          
+      # Good
+      def my_func(default=None):
+          pass
+      ```
+
+examples:
+  - input: |
+      def badly_formatted_function(param1,param2,param3 = 'default'):
+          x=param1+param2
+          return(x)
+
+      class badclass:
+        def __init__(self):
+            pass
+  - output: |
+      def badly_formatted_function(param1, param2, param3='default'):
+          x = param1 + param2
+          return x
+
+
+      class BadClass:
+          def __init__(self):
+              pass
+
+metadata:
+  priority: medium
+  version: 1.0
+</rule>
 
 ## Purpose
 

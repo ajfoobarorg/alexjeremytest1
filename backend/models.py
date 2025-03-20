@@ -1,14 +1,14 @@
-# Standard library imports
+# Standard library
 import datetime
 import json
 import sqlite3
 from typing import List
 
-# Third-party imports
+# Third-party
 import shortuuid
 from peewee import *
 
-# Local imports
+# Local
 from db_config import DB_PATH
 from board_logic import MetaBoard, Board
 
@@ -19,14 +19,11 @@ db = SqliteDatabase(DB_PATH, pragmas={
 }, detect_types=sqlite3.PARSE_DECLTYPES)  # Enable datetime type detection
 
 class BaseModel(Model):
-    """Base model class for all models in the application."""
-    
     class Meta:
         database = db
 
 class Player(BaseModel):
     """Player model representing a user of the game."""
-    
     id = CharField(max_length=22, primary_key=True)  # shortuuid is always 22 chars
     username = CharField(max_length=50, unique=True)
     email = CharField(max_length=255, unique=True)
@@ -43,25 +40,13 @@ class Player(BaseModel):
     last_active = DateTimeField(default=datetime.datetime.now)
     
     def save(self, *args, **kwargs):
-        """Override save to ensure ID is set for new players.
-        
-        Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-            
-        Returns:
-            The result of the superclass save method.
-        """
+        """Override save to ensure ID is set for new players."""
         if not self.id:
             self.id = shortuuid.uuid()
         return super().save(*args, **kwargs)
     
     def to_dict(self):
-        """Convert model to dictionary for API response.
-        
-        Returns:
-            A dictionary representation of the player.
-        """
+        """Convert model to dictionary for API response."""
         return {
             'id': self.id,  
             'username': self.username,
@@ -81,7 +66,6 @@ class Player(BaseModel):
 
 class Game(BaseModel):
     """Game model representing a single game of Ultimate Tic-Tac-Toe."""
-    
     id = CharField(max_length=22, primary_key=True)  # shortuuid is always 22 chars
     current_player = CharField(default="X")
     next_board = IntegerField(null=True)
@@ -107,39 +91,20 @@ class Game(BaseModel):
     
     # JSON fields - meta_board is now computed dynamically from boards
     boards = TextField(default=json.dumps([[""]*9 for _ in range(9)]))
-    
+
     def save(self, *args, **kwargs):
-        """Override save to ensure ID is set for new games.
-        
-        Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-            
-        Returns:
-            The result of the superclass save method.
-        """
+        """Override save to ensure ID is set for new games."""
         if not self.id:
             self.id = shortuuid.uuid()
         return super().save(*args, **kwargs)
-    
+
     def get_time_remaining(self, player):
-        """Calculate remaining time for a player.
-        
-        Args:
-            player: The player to get remaining time for ('X' or 'O').
-            
-        Returns:
-            Remaining time in seconds.
-        """
+        """Get remaining time for a player in seconds."""
         time_used = self.player_x_time_used if player == 'X' else self.player_o_time_used
         return max(0, self.TOTAL_TIME_ALLOWED - time_used)
     
     def update_time_used(self):
-        """Update the time used by the current player.
-        
-        Updates the appropriate time field for the current player based on the
-        time elapsed since the last move.
-        """
+        """Update time used by current player based on last move time."""
         now = datetime.datetime.now()
         elapsed = int((now - self.last_move_time).total_seconds())
         
@@ -153,36 +118,20 @@ class Game(BaseModel):
         return self.get_time_remaining(self.current_player)
     
     def get_boards(self) -> List[Board]:
-        """Get the list of board objects from the JSON representation.
-        
-        Returns:
-            A list of Board objects representing the game state.
-        """
+        """Get the list of Board objects."""
         boards_data = json.loads(self.boards)
         return [Board(squares) for squares in boards_data]
     
     def set_boards(self, boards: List[Board]) -> None:
-        """Update the JSON board representation from Board objects.
-        
-        Args:
-            boards: List of Board objects to store.
-        """
+        """Save the list of Board objects."""
         self.boards = json.dumps([board.to_list() for board in boards])
     
     def get_meta_board(self) -> MetaBoard:
-        """Generate a MetaBoard object from the current game state.
-        
-        Returns:
-            A MetaBoard object representing the overall game state.
-        """
+        """Get the current meta board state."""
         return MetaBoard(self.get_boards())
     
     def to_dict(self):
-        """Convert model to dictionary for API response.
-        
-        Returns:
-            A dictionary representation of the game.
-        """
+        """Convert model to dictionary for API response."""
         meta = self.get_meta_board()
         boards = self.get_boards()
         return {
@@ -207,7 +156,7 @@ class Game(BaseModel):
         }
 
 def initialize_db():
-    """Initialize the database by creating all tables if they don't exist."""
+    """Create tables if they don't exist."""
     db.connect()
-    db.create_tables([Player, Game], safe=True)
+    db.create_tables([Player, Game])
     db.close() 
