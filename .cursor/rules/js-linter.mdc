@@ -1,42 +1,79 @@
----
-description: 
-globs: 
-alwaysApply: false
----
-# JavaScript Linter Rule
+# JavaScript Linter
 
-This rule configures ESLint for JavaScript and Svelte files in the frontend source directory.
+This rule defines linting guidelines for JavaScript and related files.
 
-## Purpose
+<rule>
+name: js_linter
+description: JavaScript linting standards for this project
 
-- Identifies potential errors and problematic patterns
-- Enforces best practices for JavaScript code
-- Ensures code quality and consistency
+filters:
+  - type: file_extension
+    pattern: "\\.(js|jsx|ts|tsx|svelte)$"
+  - type: event
+    pattern: "file_edit"
 
-## Configuration
+actions:
+  - type: suggest
+    message: |
+      JavaScript code should follow these linting rules:
 
-```json
-{
-  "language": "javascript",
-  "patterns": [
-    {
-      "files": ["frontend/src/**/*.js", "frontend/src/**/*.svelte"],
-      "rules": {
-        "linters": {
-          "enabled": true,
-          "eslint": {
-            "enabled": true
+      1. Variable Naming:
+         - Use meaningful variable names
+         - Use camelCase for variables and functions
+         - Use PascalCase for classes and components
+         - Use UPPER_SNAKE_CASE for constants
+
+      2. Best Practices:
+         - Prefer `const` over `let` when variables aren't reassigned
+         - Avoid `var` completely
+         - Use template literals instead of string concatenation
+         - Use destructuring when accessing object properties
+         - Avoid deeply nested code (max 3-4 levels)
+
+      3. Error Handling:
+         - Use try/catch blocks for error-prone operations
+         - Avoid swallowing errors without handling them
+         - Consider using async/await instead of raw promises
+
+      4. Code Structure:
+         - Keep functions small and focused
+         - Limit complexity (prefer fewer logical branches)
+         - Separate logic into reusable functions
+
+      5. Other:
+         - Avoid commented-out code
+         - Use ES6+ features when appropriate
+         - Document complex functions with JSDoc comments
+
+examples:
+  - input: |
+      function getData() {
+          var data = [];
+          try {
+              data = fetchData();
+          } catch(e) {
+              console.log("error")
           }
+          return data;
+      }
+  - output: |
+      /**
+       * Fetches and returns data from the API
+       * @returns {Array} The fetched data
+       */
+      function getData() {
+        const data = [];
+        try {
+          const response = fetchData();
+          return response;
+        } catch (error) {
+          console.error('Error fetching data:', error.message);
+          return data;
         }
       }
-    }
-  ]
-}
-```
 
-## Usage Notes
+metadata:
+  priority: medium
+  version: 1.0
+</rule>
 
-- ESLint provides real-time feedback about code issues
-- Marks potential problems directly in the editor
-- Can be configured to auto-fix certain types of issues
-- Works alongside Prettier for complete code quality control 

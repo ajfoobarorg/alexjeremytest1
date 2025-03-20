@@ -1,53 +1,59 @@
----
-description: 
-globs: 
-alwaysApply: false
----
-# JavaScript Formatter Rule
+# JavaScript Formatter
 
-This rule configures Prettier for JavaScript and Svelte files in the frontend source directory.
+This rule defines formatting guidelines for JavaScript and related files.
 
-## Purpose
+<rule>
+name: js_formatter
+description: JavaScript code formatting standards for this project
 
-- Ensures consistent code style across JavaScript and Svelte files
-- Eliminates debates over formatting by enforcing standards
-- Makes code more readable and maintainable
+filters:
+  - type: file_extension
+    pattern: "\\.(js|jsx|ts|tsx|svelte)$"
+  - type: event
+    pattern: "file_edit"
 
-## Configuration
+actions:
+  - type: suggest
+    message: |
+      JavaScript code must follow these formatting rules:
 
-```json
-{
-  "language": "javascript",
-  "patterns": [
-    {
-      "files": ["frontend/src/**/*.js", "frontend/src/**/*.svelte"],
-      "rules": {
-        "formatters": {
-          "enabled": true,
-          "prettier": {
-            "printWidth": 100,
-            "tabWidth": 2,
-            "singleQuote": true,
-            "trailingComma": "es5",
-            "semi": true
-          }
-        }
+      1. Use 2 spaces for indentation (no tabs)
+      2. Maximum line length is 100 characters
+      3. Use single quotes for strings
+      4. Include trailing commas where valid in ES5
+      5. Use semicolons at the end of statements
+      6. No trailing whitespace
+      7. End files with a single newline
+
+      Example of properly formatted code:
+      ```javascript
+      function calculateTotal(items) {
+        const total = items
+          .map((item) => item.price * item.quantity)
+          .reduce((sum, value) => sum + value, 0);
+        
+        return total;
       }
-    }
-  ]
-}
-```
+      
+      const config = {
+        apiUrl: 'https://api.example.com',
+        timeout: 3000,
+        retries: 3,
+      };
+      ```
 
-## Prettier Configuration Explanation
+examples:
+  - input: |
+      function badlyFormattedFunction(param1,param2,param3 = "default"){
+      var x=param1+param2;return(x)}
+  - output: |
+      function badlyFormattedFunction(param1, param2, param3 = 'default') {
+        const x = param1 + param2;
+        return x;
+      }
 
-- `printWidth: 100` - Lines wrap at 100 characters
-- `tabWidth: 2` - Use 2 spaces for indentation
-- `singleQuote: true` - Use single quotes instead of double quotes
-- `trailingComma: "es5"` - Add trailing commas where valid in ES5
-- `semi: true` - Add semicolons at the end of statements
+metadata:
+  priority: medium
+  version: 1.0
+</rule>
 
-## Usage Notes
-
-- Applied automatically when `formatOnSave` is enabled
-- Creates consistent style across the entire frontend codebase
-- Eliminates the need for manual formatting 

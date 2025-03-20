@@ -1,8 +1,3 @@
----
-description: 
-globs: 
-alwaysApply: false
----
 # Python Linter
 
 This rule defines linting guidelines for Python files.
@@ -69,37 +64,4 @@ examples:
 metadata:
   priority: medium
   version: 1.0
-</rule>
-
-## Purpose
-
-- Enforces code quality standards
-- Identifies potential bugs and anti-patterns
-- Ensures consistent code style
-
-## Configuration
-
-```json
-{
-  "language": "python",
-  "patterns": [
-    {
-      "files": ["backend/**/*.py"],
-      "rules": {
-        "linters": {
-          "enabled": true,
-          "ruff": {
-            "enabled": true
-          }
-        }
-      }
-    }
-  ]
-}
-```
-
-## Usage Notes
-
-- Ruff is a fast Python linter written in Rust
-- Provides warnings and errors during development
-- Can automatically fix some issues when configured to do so 
+</rule> 
