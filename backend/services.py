@@ -1,10 +1,11 @@
+# Standard library imports
 import json
-from typing import Optional, Tuple
 import math
+from typing import Optional, Tuple
 
+# Local imports
 from models import Game, Player
 from board_logic import MetaBoard
-
 from schemas import PlayerLevel
 
 # Starting ELO ratings for different player levels
@@ -16,9 +17,18 @@ LEVEL_ELO_RATINGS = {
 }
 
 class PlayerService:
+    """Service for player-related operations."""
+    
     @staticmethod
     def get_player(player_id: str) -> Optional[Player]:
-        """Get a player by ID."""
+        """Get a player by ID.
+        
+        Args:
+            player_id: The ID of the player to retrieve.
+            
+        Returns:
+            The player object if found, None otherwise.
+        """
         try:
             return Player.get(Player.id == player_id)
         except Player.DoesNotExist:
@@ -26,17 +36,16 @@ class PlayerService:
     
     @staticmethod
     def calculate_elo_change(player_elo: int, opponent_elo: int, result: float, k_factor: int = 32) -> int:
-        """
-        Calculate ELO rating change.
+        """Calculate ELO rating change.
         
         Args:
-            player_elo: Current ELO rating of the player
-            opponent_elo: Current ELO rating of the opponent
-            result: 1.0 for win, 0.5 for draw, 0.0 for loss
-            k_factor: K-factor for ELO calculation (default: 32)
+            player_elo: Current ELO rating of the player.
+            opponent_elo: Current ELO rating of the opponent.
+            result: 1.0 for win, 0.5 for draw, 0.0 for loss.
+            k_factor: K-factor for ELO calculation (default: 32).
             
         Returns:
-            The change in ELO rating (positive or negative)
+            The change in ELO rating (positive or negative).
         """
         # Calculate expected score
         expected_score = 1 / (1 + math.pow(10, (opponent_elo - player_elo) / 400))
@@ -48,16 +57,15 @@ class PlayerService:
     
     @staticmethod
     def update_player_elo(player_id: str, opponent_id: str, result: str) -> Tuple[Player, int]:
-        """
-        Update player's ELO rating based on game result.
+        """Update player's ELO rating after a game.
         
         Args:
-            player_id: ID of the player
-            opponent_id: ID of the opponent
-            result: 'win', 'loss', or 'draw'
+            player_id: The ID of the player to update.
+            opponent_id: The ID of the opponent.
+            result: The result of the game ('win', 'loss', or 'draw').
             
         Returns:
-            Tuple of (updated player object, ELO change)
+            A tuple containing the updated player object and the ELO change.
         """
         player = Player.get(Player.id == player_id)
         opponent = Player.get(Player.id == opponent_id)
@@ -76,7 +84,15 @@ class PlayerService:
     
     @staticmethod
     def update_player_stats(player_id: str, result: str) -> Player:
-        """Update player stats after a game."""
+        """Update player's win/loss/draw statistics.
+        
+        Args:
+            player_id: The ID of the player to update.
+            result: The result of the game ('win', 'loss', or 'draw').
+            
+        Returns:
+            The updated player object.
+        """
         player = PlayerService.get_player(player_id)
         
         if result == 'win':
@@ -90,9 +106,18 @@ class PlayerService:
         return player
     
 class ProfileService:
+    """Service for player profile operations."""
+    
     @staticmethod
     def get_profile(player_id: str) -> Optional[Player]:
-        """Get a player's profile by ID."""
+        """Get a player's profile by ID.
+        
+        Args:
+            player_id: The ID of the player to retrieve.
+            
+        Returns:
+            The player object if found, None otherwise.
+        """
         try:
             return Player.get(Player.id == player_id)
         except Player.DoesNotExist:
@@ -100,7 +125,14 @@ class ProfileService:
     
     @staticmethod
     def get_profile_by_email(email: str) -> Optional[Player]:
-        """Get a player's profile by email."""
+        """Get a player's profile by email.
+        
+        Args:
+            email: The email of the player to retrieve.
+            
+        Returns:
+            The player object if found, None otherwise.
+        """
         try:
             return Player.get(Player.email == email)
         except Player.DoesNotExist:
@@ -108,7 +140,18 @@ class ProfileService:
     
     @staticmethod
     def create_profile(username: str, email: str, level: str, timezone: Optional[str] = None, country: Optional[str] = None) -> Player:
-        """Create a new player profile."""
+        """Create a new player profile.
+        
+        Args:
+            username: The username for the new player.
+            email: The email for the new player.
+            level: The skill level of the new player.
+            timezone: The timezone of the new player (optional).
+            country: The country code of the new player (optional).
+            
+        Returns:
+            The newly created player object.
+        """
         return Player.create(
             username=username,
             email=email,
@@ -120,7 +163,15 @@ class ProfileService:
     
     @staticmethod
     def update_profile(player_id: str, **update_data) -> Optional[Player]:
-        """Update a player's profile with the given data."""
+        """Update a player's profile.
+        
+        Args:
+            player_id: The ID of the player to update.
+            **update_data: Dictionary of fields to update.
+            
+        Returns:
+            The updated player object if found, None otherwise.
+        """
         try:
             player = Player.get(Player.id == player_id)
             for field, value in update_data.items():
@@ -133,18 +184,42 @@ class ProfileService:
     
     @staticmethod
     def check_username_exists(username: str) -> bool:
-        """Check if a username is already taken."""
+        """Check if a username is already taken.
+        
+        Args:
+            username: The username to check.
+            
+        Returns:
+            True if the username exists, False otherwise.
+        """
         return Player.select().where(Player.username == username).exists()
     
     @staticmethod
     def check_email_exists(email: str) -> bool:
-        """Check if an email is already registered."""
+        """Check if an email is already registered.
+        
+        Args:
+            email: The email to check.
+            
+        Returns:
+            True if the email exists, False otherwise.
+        """
         return Player.select().where(Player.email == email).exists()
 
 class GameService:
+    """Service for game-related operations."""
+    
     @staticmethod
     def create_game(player_x: Player, player_o: Player) -> Game:
-        """Create a new game with pre-assigned X and O players"""
+        """Create a new game between two players.
+        
+        Args:
+            player_x: The player who will play as X.
+            player_o: The player who will play as O.
+            
+        Returns:
+            The newly created game object.
+        """
         game = Game.create(
             player_x=player_x,
             player_o=player_o
@@ -153,7 +228,14 @@ class GameService:
   
     @staticmethod
     def get_game(game_id: str) -> Optional[Game]:
-        """Get a game by ID."""
+        """Get a game by ID.
+        
+        Args:
+            game_id: The ID of the game to retrieve.
+            
+        Returns:
+            The game object if found, None otherwise.
+        """
         try:
             return Game.get(Game.id == game_id)
         except Game.DoesNotExist:
@@ -161,7 +243,15 @@ class GameService:
     
     @staticmethod
     def resign_game(game_id: str, player_id: str) -> Optional[Game]:
-        """Resign from a game."""
+        """Handle a player resigning from a game.
+        
+        Args:
+            game_id: The ID of the game.
+            player_id: The ID of the player resigning.
+            
+        Returns:
+            The updated game object if found, None otherwise.
+        """
         try:
             game = Game.get(Game.id == game_id)
             
@@ -207,7 +297,17 @@ class GameService:
     
     @staticmethod
     def make_move(game_id: str, board_index: int, position: int, player_id: str) -> Tuple[Optional[Game], Optional[str]]:
-        """Make a move in the game. Returns (game, error_message)."""
+        """Make a move in a game.
+        
+        Args:
+            game_id: The ID of the game.
+            board_index: The index of the board (0-8).
+            position: The position on the board (0-8).
+            player_id: The ID of the player making the move.
+            
+        Returns:
+            A tuple containing the updated game object (or None) and an error message (or None).
+        """
         try:
             game = Game.get(Game.id == game_id)
             
