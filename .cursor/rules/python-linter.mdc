@@ -1,3 +1,8 @@
+---
+description: Python linting standards
+globs: "**/*.py"
+alwaysApply: false
+---
 # Python Linter
 
 This rule defines linting guidelines for Python files.

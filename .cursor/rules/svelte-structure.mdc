@@ -1,3 +1,8 @@
+---
+description: Svelte component structure standards
+globs: "**/*.svelte"
+alwaysApply: false
+---
 # Svelte Component Structure
 
 This rule defines the structure and organization of Svelte component files.

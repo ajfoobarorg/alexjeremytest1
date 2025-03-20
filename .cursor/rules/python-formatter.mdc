@@ -1,3 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
 # Python Formatter
 
 This rule defines proper Python formatting guidelines for the project.

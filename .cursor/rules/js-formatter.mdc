@@ -1,3 +1,8 @@
+---
+description: JavaScript formatting standards
+globs: "**/*.{js,jsx,ts,tsx,svelte}"
+alwaysApply: false
+---
 # JavaScript Formatter
 
 This rule defines formatting guidelines for JavaScript and related files.

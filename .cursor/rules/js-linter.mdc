@@ -1,3 +1,8 @@
+---
+description: JavaScript linting standards
+globs: "**/*.{js,jsx,ts,tsx,svelte}"
+alwaysApply: false
+---
 # JavaScript Linter
 
 This rule defines linting guidelines for JavaScript and related files.

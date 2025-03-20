@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description: Python docstring standards
+globs: "**/*.py"
 alwaysApply: false
 ---
 # Python Docstrings

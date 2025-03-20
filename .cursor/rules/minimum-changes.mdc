@@ -1,3 +1,8 @@
+---
+description: Guidelines for minimal code changes
+globs: "**/*.{py,js,jsx,ts,tsx,svelte,html,css,scss}"
+alwaysApply: false
+---
 # Minimum Changes Rule
 
 This rule ensures that changes to code are limited to only what is required by the prompt.
