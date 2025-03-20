@@ -1,10 +1,11 @@
+# Standard library
 import json
-from typing import Optional, Tuple
 import math
+from typing import Optional, Tuple
 
+# Local
 from models import Game, Player
 from board_logic import MetaBoard
-
 from schemas import PlayerLevel
 
 # Starting ELO ratings for different player levels

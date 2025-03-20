@@ -1,11 +1,16 @@
+# Standard library
 import datetime
 import json
+import sqlite3
+from typing import List
+
+# Third-party
 import shortuuid
 from peewee import *
+
+# Local
 from db_config import DB_PATH
 from board_logic import MetaBoard, Board
-from typing import List
-import sqlite3
 
 # Initialize database with datetime adapter
 db = SqliteDatabase(DB_PATH, pragmas={

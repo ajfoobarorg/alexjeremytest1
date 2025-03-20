@@ -1,79 +1,98 @@
 ---
-description: 
-globs: 
+description: Svelte component structure standards
+globs: "**/*.svelte"
 alwaysApply: false
 ---
-# Svelte Component Structure Rule
+# Svelte Component Structure
 
 This rule defines the structure and organization of Svelte component files.
 
-## Purpose
+<rule>
+name: svelte_structure
+description: Standards for Svelte component organization and structure
 
-- Creates a consistent component structure
-- Makes components easier to navigate and understand
-- Ensures style tags are in a consistent position
+filters:
+  - type: file_extension
+    pattern: "\\.svelte$"
+  - type: event
+    pattern: "file_edit"
 
-## Configuration
+actions:
+  - type: suggest
+    message: |
+      Svelte components should follow this structure:
 
-```json
-{
-  "language": "javascript",
-  "patterns": [
-    {
-      "files": ["frontend/src/**/*.svelte"],
-      "rules": {
-        "svelte": {
-          "component-structure": [
-            "script",
-            "style",
-            "template"
-          ],
-          "style-position": "bottom"
+      1. Script section at the top
+      2. Style section in the middle
+      3. HTML template at the bottom
+
+      ```svelte
+      <script>
+        // JS logic
+        export let props;
+        
+        // State and variables
+        let count = 0;
+        
+        // Functions
+        function handleClick() {
+          count += 1;
         }
-      }
-    }
-  ]
-}
-```
+      </script>
 
-## Example Svelte Component Structure
+      <style>
+        /* CSS styles */
+        .container {
+          max-width: 800px;
+          margin: 0 auto;
+        }
+      </style>
 
-```svelte
-<script>
-  // JavaScript logic goes here
-  export let name;
-  let count = 0;
-  
-  function increment() {
-    count += 1;
-  }
-</script>
+      <!-- HTML template -->
+      <div class="container">
+        <h1>Content</h1>
+        <button on:click={handleClick}>
+          Clicked {count} times
+        </button>
+      </div>
+      ```
 
-<style>
-  /* CSS styles go here */
-  h1 {
-    color: #ff3e00;
-    font-size: 2rem;
-  }
-  
-  button {
-    background: #ff3e00;
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-  }
-</style>
+      Additional guidelines:
+      - Group related code within each section
+      - Destructure props at the top of the script section
+      - Place lifecycle functions together
+      - Order imports logically (Svelte imports first, then components, then utilities)
+      - Use scoped styles (no :global unless necessary)
 
-<!-- HTML template goes here -->
-<h1>Hello {name}!</h1>
-<p>Current count: {count}</p>
-<button on:click={increment}>Increment</button>
-```
+examples:
+  - input: |
+      <!-- HTML first, then script, then style -->
+      <div>
+        <h1>Hello {name}</h1>
+      </div>
+      
+      <script>
+        export let name;
+      </script>
+      
+      <style>
+        h1 { color: blue; }
+      </style>
+  - output: |
+      <script>
+        export let name;
+      </script>
+      
+      <style>
+        h1 { color: blue; }
+      </style>
+      
+      <div>
+        <h1>Hello {name}</h1>
+      </div>
 
-## Usage Notes
+metadata:
+  priority: medium
+  version: 1.0
+</rule>
 
-- Script section contains all JavaScript logic
-- Style section is placed at the bottom before the template
-- Template (the HTML markup) comes last
-- This ordering is enforced by the component-structure rule 

@@ -1,9 +1,13 @@
-from cachetools import TTLCache
-from threading import Lock
-import random
+# Standard library
 import logging
+import random
+from threading import Lock
 from typing import Optional, Tuple
 
+# Third-party
+from cachetools import TTLCache
+
+# Local
 from models import Game, Player
 from services import ProfileService, GameService
 

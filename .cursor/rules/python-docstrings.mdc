@@ -1,11 +1,98 @@
 ---
-description: 
-globs: 
+description: Python docstring standards
+globs: "**/*.py"
 alwaysApply: false
 ---
-# Python Docstrings Rule
+# Python Docstrings
 
-This rule enforces Google-style docstrings for all Python files in the backend directory.
+This rule defines standards for writing docstrings in Python files.
+
+<rule>
+name: python_docstrings
+description: Python docstring standards for this project
+
+filters:
+  - type: file_extension
+    pattern: "\\.py$"
+  - type: event
+    pattern: "file_edit"
+
+actions:
+  - type: suggest
+    message: |
+      All Python functions, classes, and modules should have docstrings following this format:
+
+      For functions:
+      ```python
+      def function_name(param1, param2):
+          """
+          Brief description of the function.
+          
+          Args:
+              param1: Description of param1
+              param2: Description of param2
+              
+          Returns:
+              Description of return value
+              
+          Raises:
+              ExceptionType: When and why this exception is raised
+          """
+      ```
+
+      For classes:
+      ```python
+      class ClassName:
+          """
+          Brief description of the class.
+          
+          Attributes:
+              attr1: Description of attr1
+              attr2: Description of attr2
+          """
+      ```
+
+      For modules:
+      ```python
+      """
+      Module description.
+      
+      This module provides...
+      """
+      ```
+
+      Guidelines:
+      - All public methods and functions must have docstrings
+      - Use triple double quotes (`"""`) for all docstrings
+      - Keep the opening quotes on the same line as the declaration for one-line docstrings
+      - For multiline docstrings, place the closing quotes on their own line
+      - Use imperative mood for function/method descriptions ("Do this", not "Does this")
+      - Keep docstrings clear, concise, and focused on what the code does
+
+examples:
+  - input: |
+      def calculate_total(prices, tax_rate):
+          total = sum(prices)
+          return total * (1 + tax_rate)
+  - output: |
+      def calculate_total(prices, tax_rate):
+          """
+          Calculate the total price including tax.
+          
+          Args:
+              prices: List of item prices
+              tax_rate: Tax rate as a decimal (e.g., 0.07 for 7%)
+              
+          Returns:
+              The total price including tax
+          """
+          total = sum(prices)
+          return total * (1 + tax_rate)
+
+metadata:
+  priority: medium
+  version: 1.0
+</rule>
 
 ## Purpose
 

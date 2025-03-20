@@ -3,64 +3,76 @@ description:
 globs: 
 alwaysApply: false
 ---
-# Python Imports Rule
+# Python Imports
 
-This rule defines the ordering of imports for Python files in the backend directory.
+This rule defines standards for organizing imports in Python files.
 
-## Purpose
+<rule>
+name: python_imports
+description: Python import organization and standards for this project
 
-- Creates a consistent order for imports
-- Makes import sections more readable
-- Groups related imports together logically
+filters:
+  - type: file_extension
+    pattern: "\\.py$"
+  - type: event
+    pattern: "file_edit"
 
-## Configuration
+actions:
+  - type: suggest
+    message: |
+      Python imports must be organized in the following order, with a blank line between each group:
 
-```json
-{
-  "language": "python",
-  "patterns": [
-    {
-      "files": ["backend/**/*.py"],
-      "rules": {
-        "imports": {
-          "order": [
-            "standard",
-            "third-party",
-            "fastapi",
-            "local"
-          ]
-        }
-      }
-    }
-  ]
-}
-```
+      1. Standard library imports
+      2. Related third-party imports
+      3. Local application/library specific imports
 
-## Example Import Order
+      Example:
+      ```python
+      # Standard library
+      import os
+      import sys
+      from datetime import datetime, timedelta
+      
+      # Third-party
+      import fastapi
+      from peewee import Model, CharField
+      
+      # Local
+      from config import settings
+      from models import User
+      from schemas import UserSchema
+      ```
 
-```python
-# Standard library imports
-import os
-import sys
-from datetime import datetime
+      Additional guidelines:
+      - Sort imports alphabetically within each group
+      - Use absolute imports rather than relative imports
+      - Avoid wildcard imports (from module import *)
+      - Prefer importing modules over individual objects for standard library
+      - For very long imports, use multi-line imports with parentheses
+      - Do not import unused modules/symbols
 
-# Third-party imports
-import numpy as np
-import pandas as pd
+examples:
+  - input: |
+      from models import Player
+      import datetime
+      from schemas import LoginSchema
+      import random, json
+      from fastapi import FastAPI
+  - output: |
+      # Standard library
+      import datetime
+      import json
+      import random
+      
+      # Third-party
+      from fastapi import FastAPI
+      
+      # Local
+      from models import Player
+      from schemas import LoginSchema
 
-# FastAPI imports
-from fastapi import FastAPI, Depends
-from fastapi.responses import JSONResponse
+metadata:
+  priority: medium
+  version: 1.0
+</rule>
 
-# Local imports
-from .models import User
-from .utils import validate_input
-```
-
-## Usage Notes
-
-- Standard library imports come first
-- Third-party libraries are next
-- FastAPI framework imports follow
-- Local imports from the project come last
-- Consistently ordered imports improve readability 

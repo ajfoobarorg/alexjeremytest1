@@ -1,9 +1,13 @@
-from fastapi import FastAPI, HTTPException, Response, Request
-from fastapi.middleware.cors import CORSMiddleware
-import logging
+# Standard library
 import datetime
+import logging
 from datetime import timedelta
 
+# Third-party
+from fastapi import FastAPI, HTTPException, Response, Request
+from fastapi.middleware.cors import CORSMiddleware
+
+# Local
 from config import config
 from models import initialize_db, Player, Game
 from schemas import (
@@ -50,6 +54,16 @@ def set_player_id_cookie(response: Response, player_id: str) -> None:
 # Auth endpoints
 @app.post("/auth/signup")
 def signup(request: SignupRequest, response: Response) -> dict:
+    """
+    Create a new player account.
+    
+    Args:
+        request: User signup information
+        response: FastAPI response object to set cookies
+        
+    Returns:
+        dict: New player ID
+    """
     # Check if username or email already exists
     if ProfileService.check_username_exists(request.username):
         raise HTTPException(status_code=400, detail="Username already exists")
@@ -71,6 +85,17 @@ def signup(request: SignupRequest, response: Response) -> dict:
 
 @app.post("/auth/login")
 def login(request: Request, request_data: LoginRequest, response: Response):
+    """
+    Log in an existing player.
+    
+    Args:
+        request: FastAPI request object
+        request_data: Login credentials
+        response: FastAPI response object to set cookies
+        
+    Returns:
+        dict: Player ID
+    """
     player = ProfileService.get_profile_by_email(request_data.email)
     if not player:
         raise HTTPException(status_code=404, detail="Email not found")
