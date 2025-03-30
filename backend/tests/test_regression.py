@@ -718,23 +718,24 @@ class TestEndToEndRegression:
         # X should now have won board 3 with positions 0, 3, 6 (left column)
         assert game_state["meta_board"][3] == "X", "X should have won board 3"
         
-        # Now O has free choice since board 6 would normally be next but O already played at position 6
-        # and that position has a value of 'X'
+        # After move 31, next_board is 6, meaning O must play in board 6
         
-        # Move 32: O plays in board 5, position 4 (center)
-        logger.info("Move 32: O plays in middle-right board, center (5, 4)")
-        response = client.post(f"/games/{game_id}/move/5/4?player_id={player2_id}")
+        # Move 32: O plays in board 6, position 3 (middle-left)
+        logger.info("Move 32: O plays in bottom-left board, middle-left (6, 3)")
+        response = client.post(f"/games/{game_id}/move/6/3?player_id={player2_id}")
         assert response.status_code == 200
         game_state = response.json()
         
         # Log detailed state for debugging
+        logger.info(f"DETAILED: After move 32, game_state['boards'][6] = {game_state['boards'][6]}")
         logger.info(f"DETAILED: After move 32, next_board = {game_state['next_board']}")
         logger.info(f"DETAILED: After move 32, meta_board = {game_state['meta_board']}")
         
         # Verify move 32 results
         assert game_state["current_player"] == "X"  # Turn changed to X
-        assert game_state["boards"][5][4] == "O"  # O is placed in center of board 5
-        # Board 4 is already won by O, so X should have free choice
+        assert game_state["boards"][6][3] == "O"  # O is placed in middle-left of board 6
+        assert game_state["next_board"] == 3  # Next board is 3, which is already won by X
+        # Board 3 is already won by X, so X should have free choice
         assert game_state["next_board"] is None, "Next board should be None (free choice)"
         
         # Move 33: X plays in board 6, position 0 (top-left) to continue the win strategy
