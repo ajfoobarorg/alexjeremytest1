@@ -143,7 +143,7 @@ def update_profile(player_id: str, request: ProfileUpdateRequest):
 @app.get("/stats")
 def get_stats() -> StatsResponse:
     # Get timestamps for our time windows
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     last_24h = now - timedelta(days=1)
     last_7d = now - timedelta(days=7)
     
