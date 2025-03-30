@@ -510,14 +510,11 @@ class TestEndToEndRegression:
         assert game_state["meta_board"][4] == "O"  # Board 4 is already won by O
         
         # Let's play in position 2 (top-right) which should be free
-        logger.info(f"ALEX Game state after move 21: boards[2] = {game_state['boards'][2]}, next_board = {game_state['next_board']}")
         
         logger.info("Move 22: O plays in board 2, top-right position (2, 2)")
         response = client.post(f"/games/{game_id}/move/2/2?player_id={player2_id}")
-        logger.info("ALEX ABOUT TO FAIL")
         assert response.status_code == 200
-        logger.info("ALEX PAST THIS")
-
+        
         game_state = response.json()
         
         # Verify move 22 results
