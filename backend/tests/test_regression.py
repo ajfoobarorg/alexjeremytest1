@@ -668,6 +668,11 @@ class TestEndToEndRegression:
         assert response.status_code == 200
         game_state = response.json()
         
+        # Log the detailed state for debugging
+        logger.info(f"DETAILED: After move 29, game_state['boards'][3] = {game_state['boards'][3]}")
+        logger.info(f"DETAILED: After move 29, next_board = {game_state['next_board']}")
+        logger.info(f"DETAILED: After move 29, meta_board = {game_state['meta_board']}")
+        
         # Verify move 29 results
         assert game_state["current_player"] == "O"  # Turn changed to O
         assert game_state["boards"][3][3] == "X"  # X is placed in middle-left of board 3
