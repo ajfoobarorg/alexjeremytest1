@@ -44,7 +44,10 @@ class TestEndToEndRegression:
         game_state = self._win_subboard(game_id, player1_id, player2_id)
         
         # TODO #5: Complete the game
-        self._complete_game(game_id, player1_id, player2_id, game_state)
+        final_game_state = self._complete_game(game_id, player1_id, player2_id, game_state)
+        
+        # TODO #6: Verify ELO updates
+        self._verify_elo_updates(player1_id, player2_id, final_game_state)
         
     def _create_users_and_verify(self):
         """
@@ -844,6 +847,62 @@ class TestEndToEndRegression:
         
         logger.info("Successfully completed TODO #5")
         return game_state
+    
+    def _verify_elo_updates(self, player1_id, player2_id, game_state):
+        """
+        TODO #6: Verify ELO updates after game completion.
+        
+        - Verify both players' profiles have been updated with new ELO scores
+        - Verify the winner's ELO increased and the loser's ELO decreased
+        - Verify win/loss counts have been updated correctly
+        
+        Args:
+            player1_id: ID of player X
+            player2_id: ID of player O
+            game_state: The final game state after game completion
+        """
+        logger.info("Starting TODO #6: Verify ELO updates")
+        
+        # Verify that the game includes ELO change information
+        assert game_state["player_x"]["elo_change"] is not None, "Player X should have an ELO change recorded"
+        assert game_state["player_o"]["elo_change"] is not None, "Player O should have an ELO change recorded"
+        
+        # Get player profiles to check the updated ELO scores
+        response = client.get(f"/profile/{player1_id}")
+        assert response.status_code == 200
+        player1_profile = response.json()
+        
+        response = client.get(f"/profile/{player2_id}")
+        assert response.status_code == 200
+        player2_profile = response.json()
+        
+        # Log ELO changes for debugging
+        logger.info(f"Player X (player1) ELO change: {game_state['player_x']['elo_change']}")
+        logger.info(f"Player O (player2) ELO change: {game_state['player_o']['elo_change']}")
+        logger.info(f"Player X (player1) final ELO: {player1_profile['stats']['elo']}")
+        logger.info(f"Player O (player2) final ELO: {player2_profile['stats']['elo']}")
+        
+        # The winner was O (player2), so player2's ELO should have increased
+        # and player1's ELO should have decreased
+        assert game_state["player_o"]["elo_change"] > 0, "Winner (Player O) should have positive ELO change"
+        assert game_state["player_x"]["elo_change"] < 0, "Loser (Player X) should have negative ELO change"
+        
+        # Verify win/loss counts
+        assert player1_profile["stats"]["losses"] == 1, "Player X should have 1 loss"
+        assert player1_profile["stats"]["wins"] == 0, "Player X should have 0 wins"
+        
+        assert player2_profile["stats"]["wins"] == 1, "Player O should have 1 win"
+        assert player2_profile["stats"]["losses"] == 0, "Player O should have 0 losses"
+        
+        # Calculate expected final ELOs
+        expected_player1_elo = 700 + game_state["player_x"]["elo_change"]  # Initial ELO (INTERMEDIATE) + change
+        expected_player2_elo = 400 + game_state["player_o"]["elo_change"]  # Initial ELO (BEGINNER) + change
+        
+        # Verify final ELOs match the calculated values
+        assert player1_profile["stats"]["elo"] == expected_player1_elo, "Player X final ELO should match initial ELO + change"
+        assert player2_profile["stats"]["elo"] == expected_player2_elo, "Player O final ELO should match initial ELO + change"
+        
+        logger.info("Successfully completed TODO #6")
     
     def test_game_resignation(self, test_db):
         """Test that a player can resign from a game."""
