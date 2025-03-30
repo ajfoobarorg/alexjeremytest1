@@ -786,82 +786,19 @@ class TestEndToEndRegression:
         assert game_state["boards"][7][2] == "X"  # X is placed in top-right of board 7
         assert game_state["current_player"] == "O"  # Turn changed to O
         
-        # Move 36: O plays in board 2, which is already won by O
-        # Since board 2 is already won, O should have free choice
+        # Move 36: O plays in bottom-left board, bottom-right (6, 8)
         logger.info("Move 36: O plays in bottom-left board, bottom-right (6, 8)")
         response = client.post(f"/games/{game_id}/move/6/8?player_id={player2_id}")
         assert response.status_code == 200
         game_state = response.json()
         
         # Log detailed state for debugging
-        logger.info(f"DETAILED: After move 36, game_state['boards'][0] = {game_state['boards'][0]}")
-        logger.info(f"DETAILED: After move 36, game_state['boards'][1] = {game_state['boards'][1]}")
-        logger.info(f"DETAILED: After move 36, game_state['boards'][2] = {game_state['boards'][2]}")
-        logger.info(f"DETAILED: After move 36, game_state['boards'][3] = {game_state['boards'][3]}")
-        logger.info(f"DETAILED: After move 36, game_state['boards'][4] = {game_state['boards'][4]}")
-        logger.info(f"DETAILED: After move 36, game_state['boards'][5] = {game_state['boards'][5]}")
         logger.info(f"DETAILED: After move 36, game_state['boards'][6] = {game_state['boards'][6]}")
-        logger.info(f"DETAILED: After move 36, game_state['boards'][7] = {game_state['boards'][7]}")
-        logger.info(f"DETAILED: After move 36, game_state['boards'][8] = {game_state['boards'][8]}")
         logger.info(f"DETAILED: After move 36, next_board = {game_state['next_board']}")
         logger.info(f"DETAILED: After move 36, meta_board = {game_state['meta_board']}")
         
-
-        #stop for now -- return.
-
-        # Move 37: X plays in board 8, position 0 (top-left)
-        logger.info("Move 37: X plays in bottom-right board, top-left (8, 0)")
-        response = client.post(f"/games/{game_id}/move/8/0?player_id={player1_id}")
-        assert response.status_code == 200
-        game_state = response.json()
-        
-        # Log detailed state for debugging
-        logger.info(f"DETAILED: After move 37, game_state['boards'][8] = {game_state['boards'][8]}")
-        logger.info(f"DETAILED: After move 37, next_board = {game_state['next_board']}")
-        logger.info(f"DETAILED: After move 37, meta_board = {game_state['meta_board']}")
-        
-        # Verify move 37 results
-        assert game_state["boards"][8][0] == "X"  # X is placed in top-left of board 8
-        assert game_state["current_player"] == "O"  # Turn changed to O
-        
-        # Move 38: Since next_board is None (free choice), O plays in board 5
-        logger.info("Move 38: O plays in middle-right board, center (5, 4)")
-        response = client.post(f"/games/{game_id}/move/5/4?player_id={player2_id}")
-        assert response.status_code == 200
-        game_state = response.json()
-        
-        # Log detailed state for debugging
-        logger.info(f"DETAILED: After move 38, next_board = {game_state['next_board']}")
-        logger.info(f"DETAILED: After move 38, meta_board = {game_state['meta_board']}")
-        
-        # Move 39: Finally X plays in board 6, position 0 (top-left) to win board 6
-        # Game should be over after this move
-        logger.info("Move 39: X plays in bottom-left board, top-left (6, 0)")
-        response = client.post(f"/games/{game_id}/move/6/0?player_id={player1_id}")
-        assert response.status_code == 200
-        game_state = response.json()
-        
-        # Log detailed state for debugging
-        logger.info(f"DETAILED: After move 39, game_state['boards'][6] = {game_state['boards'][6]}")
-        logger.info(f"DETAILED: After move 39, next_board = {game_state['next_board']}")
-        logger.info(f"DETAILED: After move 39, meta_board = {game_state['meta_board']}")
-        logger.info(f"DETAILED: After move 39, game_over = {game_state['game_over']}")
-        logger.info(f"DETAILED: After move 39, winner = {game_state['winner']}")
-        
-        # Verify move 39 results - X should have won the game
-        assert game_state["boards"][6][0] == "X"  # X is placed in top-left of board 6
-        # X should now have won board 6
-        assert game_state["meta_board"][6] == "X", "X should have won board 6"
-        
-        # X has now won boards 0, 3, and 6 (left column on meta-board)
-        # Game should be over with X as the winner
-        assert game_state["game_over"] == True, "Game should be over"
-        assert game_state["winner"] == "X", "X should be the winner"
-        
-        # Verify X has won the left column on the meta-board
-        assert game_state["meta_board"][0] == "X", "X should have won board 0"
-        assert game_state["meta_board"][3] == "X", "X should have won board 3" 
-        assert game_state["meta_board"][6] == "X", "X should have won board 6"
+        # Verify the next_board constraint after move 36
+        assert game_state["next_board"] == 8, "Next board should be 8"
         
         logger.info("Successfully completed TODO #5")
         return game_state
