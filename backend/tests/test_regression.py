@@ -593,21 +593,26 @@ class TestEndToEndRegression:
         # Verify move 24 results
         assert game_state["current_player"] == "X"  # Turn changed to X
         assert game_state["boards"][7][0] == "O"  # O is placed in top-left of board 7
-        assert game_state["next_board"] == 0  # Next board is 0
         
-        # Move 25: X plays in board 0 (top-left), position 6 (bottom-left)
-        # X already has positions 1, 2, 4, 7 in board 0, adding position 6 should win this board
-        logger.info("Move 25: X plays in top-left board, bottom-left (0, 6)")
-        response = client.post(f"/games/{game_id}/move/0/6?player_id={player1_id}")
+        # Since O played in position 0 of board 7, next_board would normally be 0
+        # But board 0 is already won by X, so next_board should be None (free choice)
+        assert game_state["next_board"] is None  # Free choice since board 0 is won
+        
+        # Move 25: Since board 0 is already won by X, we can't play there
+        # Let's play in board 3 (middle-left) instead, which is part of our winning strategy
+        logger.info("Move 25: X plays in middle-left board, top-left (3, 0)")
+        response = client.post(f"/games/{game_id}/move/3/0?player_id={player1_id}")
         assert response.status_code == 200
         game_state = response.json()
         
         # Verify move 25 results
         assert game_state["current_player"] == "O"  # Turn changed to O
-        assert game_state["boards"][0][6] == "X"  # X is placed in bottom-left of board 0
-        # X should now have won board 0 with positions 0,4,6 (top-left, center, bottom-left - left column)
-        assert game_state["meta_board"][0] == "X", "X should have won board 0"
-        assert game_state["next_board"] == 6  # Next board is 6
+        assert game_state["boards"][3][0] == "X"  # X is placed in top-left of board 3
+        # Check that board 0 is still won by X
+        assert game_state["meta_board"][0] == "X", "Board 0 should still be won by X"
+        # Since X played in position 0 of board 3, next_board would normally be 0
+        # But board 0 is already won by X, so next_board should be None (free choice)
+        assert game_state["next_board"] is None, "Next board should be None since board 0 is already won"
         
         # Move 26: O plays in board 6 (bottom-left), position 1 (top-middle)
         logger.info("Move 26: O plays in bottom-left board, top-middle (6, 1)")
