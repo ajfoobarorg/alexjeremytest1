@@ -794,10 +794,21 @@ class TestEndToEndRegression:
         game_state = response.json()
         
         # Log detailed state for debugging
+        logger.info(f"DETAILED: After move 36, game_state['boards'][0] = {game_state['boards'][0]}")
+        logger.info(f"DETAILED: After move 36, game_state['boards'][1] = {game_state['boards'][1]}")
+        logger.info(f"DETAILED: After move 36, game_state['boards'][2] = {game_state['boards'][2]}")
+        logger.info(f"DETAILED: After move 36, game_state['boards'][3] = {game_state['boards'][3]}")
+        logger.info(f"DETAILED: After move 36, game_state['boards'][4] = {game_state['boards'][4]}")
+        logger.info(f"DETAILED: After move 36, game_state['boards'][5] = {game_state['boards'][5]}")
         logger.info(f"DETAILED: After move 36, game_state['boards'][6] = {game_state['boards'][6]}")
+        logger.info(f"DETAILED: After move 36, game_state['boards'][7] = {game_state['boards'][7]}")
+        logger.info(f"DETAILED: After move 36, game_state['boards'][8] = {game_state['boards'][8]}")
         logger.info(f"DETAILED: After move 36, next_board = {game_state['next_board']}")
         logger.info(f"DETAILED: After move 36, meta_board = {game_state['meta_board']}")
         
+
+        #stop for now -- return.
+
         # Move 37: X plays in board 8, position 0 (top-left)
         logger.info("Move 37: X plays in bottom-right board, top-left (8, 0)")
         response = client.post(f"/games/{game_id}/move/8/0?player_id={player1_id}")
