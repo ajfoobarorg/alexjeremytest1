@@ -730,6 +730,7 @@ class TestEndToEndRegression:
         logger.info(f"DETAILED: After move 32, game_state['boards'][6] = {game_state['boards'][6]}")
         logger.info(f"DETAILED: After move 32, next_board = {game_state['next_board']}")
         logger.info(f"DETAILED: After move 32, meta_board = {game_state['meta_board']}")
+        logger.info(f"DETAILED: After move 32, current_player = {game_state['current_player']}")
         
         # Verify move 32 results
         assert game_state["current_player"] == "X"  # Turn changed to X
@@ -738,9 +739,9 @@ class TestEndToEndRegression:
         # but board 3 is already won by X, so next_board should be None (free choice)
         assert game_state["next_board"] is None, "Next board should be None (free choice)"
         
-        # Move 33: X plays in board 6, position 0 (top-left) to continue the win strategy
-        logger.info("Move 33: X plays in bottom-left board, top-left (6, 0)")
-        response = client.post(f"/games/{game_id}/move/6/0?player_id={player1_id}")
+        # Move 33: X plays in board 6, position 6 (bottom-left) to win board 6 with a bottom row
+        logger.info("Move 33: X plays in bottom-left board, bottom-left (6, 6)")
+        response = client.post(f"/games/{game_id}/move/6/6?player_id={player1_id}")
         assert response.status_code == 200
         game_state = response.json()
         
@@ -752,8 +753,8 @@ class TestEndToEndRegression:
         logger.info(f"DETAILED: After move 33, winner = {game_state['winner']}")
         
         # Verify move 33 results - X should have won the game
-        assert game_state["boards"][6][0] == "X"  # X is placed in top-left of board 6
-        # X should now have won board 6 (since X already has positions 0, 4 and now 6)
+        assert game_state["boards"][6][6] == "X"  # X is placed in bottom-left of board 6
+        # X should now have won board 6 with positions in the diagonal (or other winning combination)
         assert game_state["meta_board"][6] == "X", "X should have won board 6"
         
         # X has now won boards 0, 3, and 6 (left column on meta-board)
