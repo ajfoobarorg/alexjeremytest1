@@ -653,6 +653,11 @@ class TestEndToEndRegression:
         # So we'll skip to the next move
         # Renumbering from here: move 30 → move 29, etc.
         
+        # Check the state of board 5 before we try to play there
+        logger.info(f"ALEX Before move 29, board 5 state: {game_state['boards'][5]}")
+        logger.info(f"ALEX Before move 29, meta_board state: {game_state['meta_board']}")
+        logger.info(f"ALEX Before move 29, next_board: {game_state['next_board']}")
+        
         # Move 29: O plays in board 5 (middle-right), position 0 (top-left)
         logger.info("Move 29: O plays in middle-right board, top-left (5, 0)")
         response = client.post(f"/games/{game_id}/move/5/0?player_id={player2_id}")
