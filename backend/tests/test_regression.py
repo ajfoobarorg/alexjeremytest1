@@ -734,8 +734,8 @@ class TestEndToEndRegression:
         # Verify move 32 results
         assert game_state["current_player"] == "X"  # Turn changed to X
         assert game_state["boards"][6][3] == "O"  # O is placed in middle-left of board 6
-        assert game_state["next_board"] == 3  # Next board is 3, which is already won by X
-        # Board 3 is already won by X, so X should have free choice
+        # Playing in position 3 would normally send to board 3,
+        # but board 3 is already won by X, so next_board should be None (free choice)
         assert game_state["next_board"] is None, "Next board should be None (free choice)"
         
         # Move 33: X plays in board 6, position 0 (top-left) to continue the win strategy
