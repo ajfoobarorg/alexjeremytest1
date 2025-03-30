@@ -800,6 +800,22 @@ class TestEndToEndRegression:
         # Verify the next_board constraint after move 36
         assert game_state["next_board"] == 8, "Next board should be 8 (since O played in position 8 of board 6)"
         
+        # Move 37: X plays in board 8, position 0 (top-left)
+        logger.info("Move 37: X plays in bottom-right board, top-left (8, 0)")
+        response = client.post(f"/games/{game_id}/move/8/0?player_id={player1_id}")
+        assert response.status_code == 200
+        game_state = response.json()
+        
+        # Log detailed state for debugging
+        logger.info(f"DETAILED: After move 37, game_state['boards'][8] = {game_state['boards'][8]}")
+        logger.info(f"DETAILED: After move 37, next_board = {game_state['next_board']}")
+        logger.info(f"DETAILED: After move 37, meta_board = {game_state['meta_board']}")
+        
+        # Verify move 37 results
+        assert game_state["boards"][8][0] == "X", "X should be placed in top-left of board 8"
+        assert game_state["current_player"] == "O", "Turn should change to O"
+        assert game_state["next_board"] is None, "Next board should be None (free choice)"
+        
         logger.info("Successfully completed TODO #5")
         return game_state
     
