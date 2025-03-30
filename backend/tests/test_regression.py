@@ -478,7 +478,14 @@ class TestEndToEndRegression:
         
         # Verify move 20 results
         assert game_state["current_player"] == "X"  # Turn changed to X
+        logger.info("ALEX about to check...")
+        logger.info(f"ALEX Game state after move 20: boards[3] = {game_state['boards'][3]}, next_board = {game_state['next_board']}")
+        logger.info(f"ALEX Game state after move 20: boards[4] = {game_state['boards'][4]}, next_board = {game_state['next_board']}")
+
+
         assert game_state["next_board"] == 4  # Next player must play in board 4
+        logger.info("ALEX past it...")
+
         assert game_state["boards"][3][4] == "O"  # O is placed in center of board 3
         
         logger.info(f"Game state after move 20: boards[3] = {game_state['boards'][3]}, next_board = {game_state['next_board']}")
