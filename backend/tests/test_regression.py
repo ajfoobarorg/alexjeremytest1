@@ -816,6 +816,32 @@ class TestEndToEndRegression:
         assert game_state["current_player"] == "O", "Turn should change to O"
         assert game_state["next_board"] is None, "Next board should be None (free choice)"
         
+        # Move 38: O plays in board 6, position 0 (top-left) to win board 6 and complete a diagonal win
+        logger.info("Move 38: O plays in bottom-left board, top-left (6, 0)")
+        response = client.post(f"/games/{game_id}/move/6/0?player_id={player2_id}")
+        assert response.status_code == 200
+        game_state = response.json()
+        
+        # Log detailed state for debugging
+        logger.info(f"DETAILED: After move 38, game_state['boards'][6] = {game_state['boards'][6]}")
+        logger.info(f"DETAILED: After move 38, next_board = {game_state['next_board']}")
+        logger.info(f"DETAILED: After move 38, meta_board = {game_state['meta_board']}")
+        logger.info(f"DETAILED: After move 38, game_over = {game_state['game_over']}")
+        logger.info(f"DETAILED: After move 38, winner = {game_state['winner']}")
+        
+        # Verify move 38 results - O should have won board 6
+        assert game_state["boards"][6][0] == "O", "O should be placed in top-left of board 6"
+        assert game_state["meta_board"][6] == "O", "O should have won board 6"
+        
+        # Game should be over with O as the winner
+        assert game_state["game_over"] == True, "Game should be over"
+        assert game_state["winner"] == "O", "O should be the winner"
+        
+        # Verify O has won the diagonal on the meta-board (boards 2, 4, 6)
+        assert game_state["meta_board"][2] == "O", "O should have won board 2"
+        assert game_state["meta_board"][4] == "O", "O should have won board 4" 
+        assert game_state["meta_board"][6] == "O", "O should have won board 6"
+        
         logger.info("Successfully completed TODO #5")
         return game_state
     
