@@ -798,7 +798,7 @@ class TestEndToEndRegression:
         logger.info(f"DETAILED: After move 36, meta_board = {game_state['meta_board']}")
         
         # Verify the next_board constraint after move 36
-        assert game_state["next_board"] == 8, "Next board should be 8"
+        assert game_state["next_board"] == 8, "Next board should be 8 (since O played in position 8 of board 6)"
         
         logger.info("Successfully completed TODO #5")
         return game_state
