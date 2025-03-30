@@ -22,47 +22,46 @@ class TestEndToEndRegression:
         """
         Complete end-to-end test of the application.
         
-        Test plan:
+        Test plan divided into manageable steps with each step in its own method:
         
         TODO #1: User creation and authentication
+        TODO #2: Game creation
+        TODO #3: Play initial moves
+        TODO #4: Win a sub-board
+        TODO #5: Complete the game
+        TODO #6: Verify ELO updates
+        """
+        # TODO #1: User creation and authentication
+        player1_id, player2_id = self._create_users_and_verify()
+        
+        # TODO #2: Game creation
+        game_id = self._create_game_and_verify(player1_id, player2_id)
+        
+        # TODO #3: Play initial moves
+        # Commented out for now - will test after verifying first two parts work
+        # self._play_initial_moves(game_id, player1_id, player2_id)
+        
+        # Remaining TODOs will be implemented later
+        
+    def _create_users_and_verify(self):
+        """
+        TODO #1: Create users and verify their profiles.
+        
         - Create two users with different skill levels
         - Verify user profiles and initial ELO ratings
         - Test login/logout functionality
         - Verify site stats endpoint
         
-        TODO #2: Game creation
-        - Create a game directly in the database (simpler than using matchmaking)
-        - Verify initial game state
-        
-        TODO #3: Play initial moves
-        - Make several valid moves, alternating between players
-        - Verify the game state is updated correctly
-        - Specifically check the next_board constraint is followed
-        - Log the full game state after each move
-        
-        TODO #4: Win a sub-board
-        - Make moves to have player X win a specific sub-board
-        - Verify the sub-board win is reflected in the meta-board state
-        - Continue playing valid moves
-        
-        TODO #5: Complete the game
-        - Have player X win enough sub-boards to win the entire game
-        - Verify the game_over and winner fields are set correctly
-        
-        TODO #6: Verify ELO updates
-        - Check that player profiles are updated with the correct wins/losses
-        - Verify the ELO scores have been adjusted appropriately
-        - Test profile update functionality
+        Returns:
+            tuple: (player1_id, player2_id) - The IDs of the created players
         """
-        
-        # TODO #1 implementation: User creation and authentication
         logger.info("Starting TODO #1: User creation and authentication")
         
         # Create two players with different skill levels
         player1_data = {
             "username": "player1",
             "email": "player1@example.com",
-            "level": PlayerLevel.INTERMEDIATE,
+            "level": PlayerLevel.INTERMEDIATE,  # This gives an ELO of 700
             "timezone": "America/Los_Angeles",
             "country": "US"
         }
@@ -70,7 +69,7 @@ class TestEndToEndRegression:
         player2_data = {
             "username": "player2",
             "email": "player2@example.com",
-            "level": PlayerLevel.BEGINNER,
+            "level": PlayerLevel.BEGINNER,  # This gives an ELO of 400
             "timezone": "America/New_York",
             "country": "US"
         }
@@ -116,8 +115,22 @@ class TestEndToEndRegression:
         assert "players_online" in stats
         
         logger.info("Successfully completed TODO #1")
+        return player1_id, player2_id
         
-        # TODO #2 implementation: Game creation
+    def _create_game_and_verify(self, player1_id, player2_id):
+        """
+        TODO #2: Create a game and verify its initial state.
+        
+        - Create a game directly in the database
+        - Verify initial game state
+        
+        Args:
+            player1_id: ID of player X
+            player2_id: ID of player O
+            
+        Returns:
+            str: The ID of the created game
+        """
         logger.info("Starting TODO #2: Game creation")
         
         # Create a game directly in the database
@@ -155,6 +168,85 @@ class TestEndToEndRegression:
         assert all(cell == "" for cell in game_state["meta_board"])
         
         logger.info("Successfully completed TODO #2")
+        return game_id
+        
+    def _play_initial_moves(self, game_id, player1_id, player2_id):
+        """
+        TODO #3: Play initial moves and verify game state after each move.
+        
+        - Make several valid moves, alternating between players
+        - Verify the game state is updated correctly
+        - Specifically check the next_board constraint is followed
+        
+        Args:
+            game_id: ID of the game
+            player1_id: ID of player X
+            player2_id: ID of player O
+            
+        Returns:
+            dict: The game state after the moves
+        """
+        logger.info("Starting TODO #3: Play initial moves")
+        
+        # Move 1: X plays in the center of the center board (board 4, position 4)
+        logger.info("Move 1: X plays in center of center board (4, 4)")
+        response = client.post(f"/games/{game_id}/move/4/4?player_id={player1_id}")
+        assert response.status_code == 200
+        game_state = response.json()
+        
+        # Verify move 1 results
+        assert game_state["current_player"] == "O"  # Turn changed to O
+        assert game_state["next_board"] == 4  # Next player must play in board 4
+        assert game_state["boards"][4][4] == "X"  # X is placed in center of board 4
+        
+        # Log entire game state for debugging
+        logger.info(f"Game state after move 1: boards[4] = {game_state['boards'][4]}, next_board = {game_state['next_board']}")
+        
+        # Move 2: O plays in center board, top-left (board 4, position 0)
+        logger.info("Move 2: O plays in center board, top-left (4, 0)")
+        response = client.post(f"/games/{game_id}/move/4/0?player_id={player2_id}")
+        assert response.status_code == 200
+        game_state = response.json()
+        
+        # Verify move 2 results
+        assert game_state["current_player"] == "X"  # Turn changed to X
+        assert game_state["next_board"] == 0  # Next player must play in board 0
+        assert game_state["boards"][4][0] == "O"  # O is placed in top-left of board 4
+        
+        logger.info(f"Game state after move 2: boards[4] = {game_state['boards'][4]}, next_board = {game_state['next_board']}")
+        
+        # Move 3: X plays in top-left board, center (board 0, position 4)
+        logger.info("Move 3: X plays in top-left board, center (0, 4)")
+        response = client.post(f"/games/{game_id}/move/0/4?player_id={player1_id}")
+        assert response.status_code == 200
+        game_state = response.json()
+        
+        # Verify move 3 results
+        assert game_state["current_player"] == "O"  # Turn changed to O
+        assert game_state["next_board"] == 4  # Next player must play in board 4
+        assert game_state["boards"][0][4] == "X"  # X is placed in center of board 0
+        
+        logger.info(f"Game state after move 3: boards[0] = {game_state['boards'][0]}, next_board = {game_state['next_board']}")
+        
+        # Move 4: O plays in center board, top-right (board 4, position 2)
+        logger.info("Move 4: O plays in center board, top-right (4, 2)")
+        response = client.post(f"/games/{game_id}/move/4/2?player_id={player2_id}")
+        assert response.status_code == 200
+        game_state = response.json()
+        
+        # Verify move 4 results
+        assert game_state["current_player"] == "X"  # Turn changed to X
+        assert game_state["next_board"] == 2  # Next player must play in board 2
+        assert game_state["boards"][4][2] == "O"  # O is placed in top-right of board 4
+        
+        logger.info(f"Game state after move 4: boards[4] = {game_state['boards'][4]}, next_board = {game_state['next_board']}")
+        
+        # Verify that no one has won any boards yet
+        for board_index in range(9):
+            assert game_state["meta_board"][board_index] == ""
+        
+        logger.info("Successfully completed TODO #3")
+        return game_state
 
     def test_game_resignation(self, test_db):
         """Test that a player can resign from a game."""
