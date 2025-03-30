@@ -523,6 +523,11 @@ class TestEndToEndRegression:
         # Verify move 22 results
         assert game_state["current_player"] == "X"  # Turn changed to X
         assert game_state["boards"][2][2] == "O"  # O is placed in top-right of board 2
+        
+        # O has now won board 2 by completing the top row (positions 0, 1, 2)
+        # So next_board should be None (free choice for X)
+        assert game_state["meta_board"][2] == "O", "Board 2 should be won by O after move 22"
+        assert game_state["next_board"] is None, "Next board should be None since board 2 is won by O"
         logger.info(f"After move 22, next_board = {game_state['next_board']}")
         
         logger.info(f"Game state after move 22: boards[5] = {game_state['boards'][5]}, next_board = {game_state['next_board']}")
