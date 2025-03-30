@@ -22,3 +22,6 @@
 - Feature branches from main
 - Descriptive commit messages
 - PR for all changes
+
+## Cursor Rules
+This project uses Cursor rules defined in .cursor/rules/. When using Claude Code CLI, please read and apply all rules from this directory.
