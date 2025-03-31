@@ -3,8 +3,11 @@ import os
 import tempfile
 import datetime
 import json
+import logging
 from peewee import SqliteDatabase
 from models import db, Player, Game
+
+logger = logging.getLogger(__name__)
 
 @pytest.fixture(autouse=True)
 def test_db():
@@ -87,4 +90,97 @@ def completed_game(sample_players):
         boards=json.dumps(boards),
         completed_at=datetime.datetime.now()
     )
-    return game 
+    return game
+
+@pytest.fixture(scope="session")
+def backend_server():
+    """Start a backend server for true HTTP testing.
+    
+    Note: Only use this fixture if you want to test against a real server.
+    For normal tests, the TestClient is faster and more convenient.
+    """
+    # Comment out the server start code to use the TestClient by default
+    # Uncomment this section to start a real server
+    """
+    from tests.http_client import start_server_thread
+    server = start_server_thread()
+    yield server
+    # Server will be stopped by atexit handler
+    """
+    
+    # For now, we're just yielding None to indicate no real server
+    yield None
+
+@pytest.fixture
+def api_client(backend_server):
+    """Create an API client for HTTP-based tests.
+    
+    When backend_server is None (default), this creates a client that uses
+    the FastAPI TestClient. When a real server is started, this creates
+    a client that makes real HTTP requests.
+    """
+    # If we're using a real server, create a real HTTP client
+    if backend_server:
+        from tests.http_client import ApiClient
+        return ApiClient(backend_server.server_url)
+    
+    # Otherwise, create a wrapper around the TestClient
+    # that has the same interface as ApiClient
+    from fastapi.testclient import TestClient
+    from main import app
+    
+    test_client = TestClient(app)
+    
+    class TestClientWrapper:
+        def __init__(self):
+            self.client = test_client
+            
+        def signup(self, user_data):
+            return self.client.post("/auth/signup", json=user_data)
+        
+        def login(self, email):
+            return self.client.post("/auth/login", json={"email": email})
+        
+        def logout(self):
+            return self.client.post("/auth/logout")
+        
+        def get_profile(self, player_id):
+            return self.client.get(f"/profile/{player_id}")
+        
+        def get_stats(self):
+            return self.client.get("/stats")
+        
+        def get_game(self, game_id):
+            return self.client.get(f"/games/{game_id}")
+        
+        def make_move(self, game_id, board_index, position, player_id):
+            return self.client.post(
+                f"/games/{game_id}/move/{board_index}/{position}?player_id={player_id}"
+            )
+        
+        def create_game(self, player_x_id, player_o_id):
+            # This endpoint might not exist, but included for completeness
+            return self.client.post(
+                "/games/create",
+                json={"player_x_id": player_x_id, "player_o_id": player_o_id}
+            )
+        
+        def direct_game_creation(self, player_x_id, player_o_id):
+            """Create a game directly (test helper)."""
+            # Since we're in-process, we can create a Game object directly
+            # This wouldn't be possible with a real HTTP client
+            player_x = Player.get(Player.id == player_x_id)
+            player_o = Player.get(Player.id == player_o_id)
+            game = Game.create(
+                player_x=player_x,
+                player_o=player_o,
+                current_player="X",
+                last_move_time=datetime.datetime.now(),
+                started=True
+            )
+            return game
+        
+        def resign_game(self, game_id, player_id):
+            return self.client.post(f"/games/{game_id}/resign?player_id={player_id}")
+    
+    return TestClientWrapper() 

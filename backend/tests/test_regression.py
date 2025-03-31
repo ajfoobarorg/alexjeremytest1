@@ -1,14 +1,9 @@
 import pytest
 import logging
-from fastapi.testclient import TestClient
 from datetime import datetime
 
-from main import app
-from models import Player, Game, Board
 from schemas import PlayerLevel
 
-# Create a test client
-client = TestClient(app)
 logger = logging.getLogger(__name__)
 
 @pytest.mark.e2e
@@ -18,7 +13,7 @@ class TestEndToEndRegression:
     This test will verify the entire game flow from user registration to game completion.
     """
     
-    def test_full_game_flow(self, test_db):
+    def test_full_game_flow(self, test_db, api_client):
         """
         Complete end-to-end test of the application.
         
@@ -32,24 +27,24 @@ class TestEndToEndRegression:
         TODO #6: Verify ELO updates
         """
         # TODO #1: User creation and authentication
-        player1_id, player2_id = self._create_users_and_verify()
+        player1_id, player2_id = self._create_users_and_verify(api_client)
         
         # TODO #2: Game creation
-        game_id = self._create_game_and_verify(player1_id, player2_id)
+        game_id = self._create_game_and_verify(api_client, player1_id, player2_id)
         
         # TODO #3: Play initial moves
-        self._play_initial_moves(game_id, player1_id, player2_id)
+        self._play_initial_moves(api_client, game_id, player1_id, player2_id)
         
         # TODO #4: Win a sub-board
-        game_state = self._win_subboard(game_id, player1_id, player2_id)
+        game_state = self._win_subboard(api_client, game_id, player1_id, player2_id)
         
         # TODO #5: Complete the game
-        final_game_state = self._complete_game(game_id, player1_id, player2_id, game_state)
+        final_game_state = self._complete_game(api_client, game_id, player1_id, player2_id, game_state)
         
         # TODO #6: Verify ELO updates
-        self._verify_elo_updates(player1_id, player2_id, final_game_state)
+        self._verify_elo_updates(api_client, player1_id, player2_id, final_game_state)
         
-    def _create_users_and_verify(self):
+    def _create_users_and_verify(self, api_client):
         """
         TODO #1: Create users and verify their profiles.
         
@@ -58,6 +53,9 @@ class TestEndToEndRegression:
         - Test login/logout functionality
         - Verify site stats endpoint
         
+        Args:
+            api_client: The API client to use for HTTP requests
+            
         Returns:
             tuple: (player1_id, player2_id) - The IDs of the created players
         """
@@ -67,7 +65,7 @@ class TestEndToEndRegression:
         player1_data = {
             "username": "player1",
             "email": "player1@example.com",
-            "level": PlayerLevel.INTERMEDIATE,  # This gives an ELO of 700
+            "level": "INTERMEDIATE",  # This gives an ELO of 700
             "timezone": "America/Los_Angeles",
             "country": "US"
         }
@@ -75,46 +73,46 @@ class TestEndToEndRegression:
         player2_data = {
             "username": "player2",
             "email": "player2@example.com",
-            "level": PlayerLevel.BEGINNER,  # This gives an ELO of 400
+            "level": "BEGINNER",  # This gives an ELO of 400
             "timezone": "America/New_York",
             "country": "US"
         }
         
         # Create player 1
-        response = client.post("/auth/signup", json=player1_data)
+        response = api_client.signup(player1_data)
         assert response.status_code == 200
         player1_id = response.json()["id"]
         logger.info(f"Created player1 with ID: {player1_id}")
         
         # Create player 2
-        response = client.post("/auth/signup", json=player2_data)
+        response = api_client.signup(player2_data)
         assert response.status_code == 200
         player2_id = response.json()["id"]
         logger.info(f"Created player2 with ID: {player2_id}")
         
         # Verify player profiles and initial ELO
-        response = client.get(f"/profile/{player1_id}")
+        response = api_client.get_profile(player1_id)
         assert response.status_code == 200
         player1_profile = response.json()
         assert player1_profile["username"] == "player1"
         assert player1_profile["stats"]["elo"] == 700  # INTERMEDIATE level
         
-        response = client.get(f"/profile/{player2_id}")
+        response = api_client.get_profile(player2_id)
         assert response.status_code == 200
         player2_profile = response.json()
         assert player2_profile["username"] == "player2"
         assert player2_profile["stats"]["elo"] == 400  # BEGINNER level
         
         # Test login functionality
-        response = client.post("/auth/login", json={"email": "player1@example.com"})
+        response = api_client.login("player1@example.com")
         assert response.status_code == 200
         
         # Test logout functionality
-        response = client.post("/auth/logout")
+        response = api_client.logout()
         assert response.status_code == 200
         
         # Verify site stats
-        response = client.get("/stats")
+        response = api_client.get_stats()
         assert response.status_code == 200
         stats = response.json()
         assert "games_today" in stats
@@ -123,14 +121,15 @@ class TestEndToEndRegression:
         logger.info("Successfully completed TODO #1")
         return player1_id, player2_id
         
-    def _create_game_and_verify(self, player1_id, player2_id):
+    def _create_game_and_verify(self, api_client, player1_id, player2_id):
         """
         TODO #2: Create a game and verify its initial state.
         
-        - Create a game directly in the database
+        - Create a game using the API
         - Verify initial game state
         
         Args:
+            api_client: The API client to use for HTTP requests
             player1_id: ID of player X
             player2_id: ID of player O
             
@@ -139,19 +138,30 @@ class TestEndToEndRegression:
         """
         logger.info("Starting TODO #2: Game creation")
         
-        # Create a game directly in the database
-        game = Game.create(
-            player_x=Player.get(Player.id == player1_id),
-            player_o=Player.get(Player.id == player2_id),
-            current_player="X",
-            last_move_time=datetime.now(),
-            started=True
-        )
-        game_id = game.id
-        logger.info(f"Created game with ID: {game_id}")
+        # Try to create a game through the API first
+        try:
+            # If the server has a create game endpoint
+            response = api_client.create_game(player1_id, player2_id)
+            if response.status_code == 200:
+                game_id = response.json()["id"]
+                logger.info(f"Created game with ID: {game_id} through API endpoint")
+            else:
+                # Fall back to direct creation
+                raise Exception("API game creation failed")
+        except:
+            # If no API endpoint, use the direct method in our wrapper
+            # This works for the TestClientWrapper but not for real HTTP clients
+            try:
+                game = api_client.direct_game_creation(player1_id, player2_id)
+                game_id = game.id
+                logger.info(f"Created game with ID: {game_id} through direct creation")
+            except Exception as e:
+                # This would fail with a real HTTP client without a create endpoint
+                logger.error(f"Failed to create game: {str(e)}")
+                raise
         
         # Verify initial game state
-        response = client.get(f"/games/{game_id}")
+        response = api_client.get_game(game_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -176,7 +186,7 @@ class TestEndToEndRegression:
         logger.info("Successfully completed TODO #2")
         return game_id
         
-    def _play_initial_moves(self, game_id, player1_id, player2_id):
+    def _play_initial_moves(self, api_client, game_id, player1_id, player2_id):
         """
         TODO #3: Play initial moves and verify game state after each move.
         
@@ -185,6 +195,7 @@ class TestEndToEndRegression:
         - Specifically check the next_board constraint is followed
         
         Args:
+            api_client: The API client to use for HTTP requests
             game_id: ID of the game
             player1_id: ID of player X
             player2_id: ID of player O
@@ -196,7 +207,7 @@ class TestEndToEndRegression:
         
         # Move 1: X plays in the center of the center board (board 4, position 4)
         logger.info("Move 1: X plays in center of center board (4, 4)")
-        response = client.post(f"/games/{game_id}/move/4/4?player_id={player1_id}")
+        response = api_client.make_move(game_id, 4, 4, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -210,7 +221,7 @@ class TestEndToEndRegression:
         
         # Move 2: O plays in center board, top-left (board 4, position 0)
         logger.info("Move 2: O plays in center board, top-left (4, 0)")
-        response = client.post(f"/games/{game_id}/move/4/0?player_id={player2_id}")
+        response = api_client.make_move(game_id, 4, 0, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -223,7 +234,7 @@ class TestEndToEndRegression:
         
         # Move 3: X plays in top-left board, center (board 0, position 4)
         logger.info("Move 3: X plays in top-left board, center (0, 4)")
-        response = client.post(f"/games/{game_id}/move/0/4?player_id={player1_id}")
+        response = api_client.make_move(game_id, 0, 4, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -236,7 +247,7 @@ class TestEndToEndRegression:
         
         # Move 4: O plays in center board, top-right (board 4, position 2)
         logger.info("Move 4: O plays in center board, top-right (4, 2)")
-        response = client.post(f"/games/{game_id}/move/4/2?player_id={player2_id}")
+        response = api_client.make_move(game_id, 4, 2, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -254,7 +265,7 @@ class TestEndToEndRegression:
         logger.info("Successfully completed TODO #3")
         return game_state
         
-    def _win_subboard(self, game_id, player1_id, player2_id):
+    def _win_subboard(self, api_client, game_id, player1_id, player2_id):
         """
         TODO #4: Win a sub-board.
         
@@ -275,7 +286,7 @@ class TestEndToEndRegression:
         # Move 5: X plays in top-right board (board 2), center (2, 4)
         # Following the next_board constraint (next_board = 2 from previous move)
         logger.info("Move 5: X plays in top-right board, center (2, 4)")
-        response = client.post(f"/games/{game_id}/move/2/4?player_id={player1_id}")
+        response = api_client.make_move(game_id, 2, 4, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -288,7 +299,7 @@ class TestEndToEndRegression:
         
         # Move 6: O plays in center board, bottom-left (4, 6)
         logger.info("Move 6: O plays in center board, bottom-left (4, 6)")
-        response = client.post(f"/games/{game_id}/move/4/6?player_id={player2_id}")
+        response = api_client.make_move(game_id, 4, 6, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -301,7 +312,7 @@ class TestEndToEndRegression:
         
         # Move 7: X plays in bottom-left board, center (6, 4)
         logger.info("Move 7: X plays in bottom-left board, center (6, 4)")
-        response = client.post(f"/games/{game_id}/move/6/4?player_id={player1_id}")
+        response = api_client.make_move(game_id, 6, 4, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -314,7 +325,7 @@ class TestEndToEndRegression:
         
         # Move 8: O plays in center board, bottom-right (4, 8)
         logger.info("Move 8: O plays in center board, bottom-right (4, 8)")
-        response = client.post(f"/games/{game_id}/move/4/8?player_id={player2_id}")
+        response = api_client.make_move(game_id, 4, 8, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -327,7 +338,7 @@ class TestEndToEndRegression:
         
         # Move 9: X plays in bottom-right board, center (8, 4)
         logger.info("Move 9: X plays in bottom-right board, center (8, 4)")
-        response = client.post(f"/games/{game_id}/move/8/4?player_id={player1_id}")
+        response = api_client.make_move(game_id, 8, 4, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -340,7 +351,7 @@ class TestEndToEndRegression:
         
         # Move 10: O plays in center board, top-middle (4, 1)
         logger.info("Move 10: O plays in center board, top-middle (4, 1)")
-        response = client.post(f"/games/{game_id}/move/4/1?player_id={player2_id}")
+        response = api_client.make_move(game_id, 4, 1, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -353,7 +364,7 @@ class TestEndToEndRegression:
         
         # Move 11: X plays in top-middle board, top-left (1, 0)
         logger.info("Move 11: X plays in top-middle board, top-left (1, 0)")
-        response = client.post(f"/games/{game_id}/move/1/0?player_id={player1_id}")
+        response = api_client.make_move(game_id, 1, 0, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -366,7 +377,7 @@ class TestEndToEndRegression:
         
         # Move 12: O plays in top-left board, top-left (0, 0)
         logger.info("Move 12: O plays in top-left board, top-left (0, 0)")
-        response = client.post(f"/games/{game_id}/move/0/0?player_id={player2_id}")
+        response = api_client.make_move(game_id, 0, 0, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -383,7 +394,7 @@ class TestEndToEndRegression:
         
         # Move 13: X plays in top-left board, top-middle (0, 1)
         logger.info("Move 13: X plays in top-left board, top-middle (0, 1)")
-        response = client.post(f"/games/{game_id}/move/0/1?player_id={player1_id}")
+        response = api_client.make_move(game_id, 0, 1, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -396,7 +407,7 @@ class TestEndToEndRegression:
         
         # Move 14: O plays in top-middle board, top-middle (1, 1)
         logger.info("Move 14: O plays in top-middle board, top-middle (1, 1)")
-        response = client.post(f"/games/{game_id}/move/1/1?player_id={player2_id}")
+        response = api_client.make_move(game_id, 1, 1, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -409,7 +420,7 @@ class TestEndToEndRegression:
         
         # Move 15: X plays in top-middle board, top-right (1, 2)
         logger.info("Move 15: X plays in top-middle board, top-right (1, 2)")
-        response = client.post(f"/games/{game_id}/move/1/2?player_id={player1_id}")
+        response = api_client.make_move(game_id, 1, 2, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -424,7 +435,7 @@ class TestEndToEndRegression:
         
         # Move 16: O plays in top-right board, top-left (2, 0)
         logger.info("Move 16: O plays in top-right board, top-left (2, 0)")
-        response = client.post(f"/games/{game_id}/move/2/0?player_id={player2_id}")
+        response = api_client.make_move(game_id, 2, 0, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -437,7 +448,7 @@ class TestEndToEndRegression:
         
         # Move 17: X plays in top-left board, top-right (0, 2)
         logger.info("Move 17: X plays in top-left board, top-right (0, 2)")
-        response = client.post(f"/games/{game_id}/move/0/2?player_id={player1_id}")
+        response = api_client.make_move(game_id, 0, 2, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -452,7 +463,7 @@ class TestEndToEndRegression:
         
         # Move 18: O plays in top-right board, top-middle (2, 1)
         logger.info("Move 18: O plays in top-right board, top-middle (2, 1)")
-        response = client.post(f"/games/{game_id}/move/2/1?player_id={player2_id}")
+        response = api_client.make_move(game_id, 2, 1, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -465,7 +476,7 @@ class TestEndToEndRegression:
         
         # Move 19: X plays in top-middle board, middle-left (1, 3)
         logger.info("Move 19: X plays in top-middle board, middle-left (1, 3)")
-        response = client.post(f"/games/{game_id}/move/1/3?player_id={player1_id}")
+        response = api_client.make_move(game_id, 1, 3, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -478,7 +489,7 @@ class TestEndToEndRegression:
         
         # Move 20: O plays in middle-left board, center (3, 4)
         logger.info("Move 20: O plays in middle-left board, center (3, 4)")
-        response = client.post(f"/games/{game_id}/move/3/4?player_id={player2_id}")
+        response = api_client.make_move(game_id, 3, 4, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -496,7 +507,7 @@ class TestEndToEndRegression:
         
         # Move 21: Since we have free choice, let's play in board 1 (top-middle)
         logger.info("Move 21: X plays in board 1, center position (1, 4)")
-        response = client.post(f"/games/{game_id}/move/1/4?player_id={player1_id}")
+        response = api_client.make_move(game_id, 1, 4, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -518,7 +529,7 @@ class TestEndToEndRegression:
         # Let's play in position 2 (top-right) which should be free
         
         logger.info("Move 22: O plays in board 2, top-right position (2, 2)")
-        response = client.post(f"/games/{game_id}/move/2/2?player_id={player2_id}")
+        response = api_client.make_move(game_id, 2, 2, player2_id)
         assert response.status_code == 200
         
         game_state = response.json()
@@ -537,7 +548,7 @@ class TestEndToEndRegression:
         
         # Move 23: X plays in board 0 (top-left), trying to complete a row
         logger.info("Move 23: X plays in board 0, position 7 (bottom-middle)")
-        response = client.post(f"/games/{game_id}/move/0/7?player_id={player1_id}")
+        response = api_client.make_move(game_id, 0, 7, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -564,7 +575,7 @@ class TestEndToEndRegression:
         logger.info("Successfully completed TODO #4")
         return game_state
     
-    def _complete_game(self, game_id, player1_id, player2_id, game_state):
+    def _complete_game(self, api_client, game_id, player1_id, player2_id, game_state):
         """
         TODO #5: Complete the game with a deterministic winning strategy.
         
@@ -589,7 +600,7 @@ class TestEndToEndRegression:
         
         # Move 24: O plays in board 7 (bottom-middle), position 0 (top-left)
         logger.info("Move 24: O plays in bottom-middle board, top-left (7, 0)")
-        response = client.post(f"/games/{game_id}/move/7/0?player_id={player2_id}")
+        response = api_client.make_move(game_id, 7, 0, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -604,7 +615,7 @@ class TestEndToEndRegression:
         # Move 25: Since board 0 is already won by X, we can't play there
         # Let's play in board 3 (middle-left) instead, which is part of our winning strategy
         logger.info("Move 25: X plays in middle-left board, top-left (3, 0)")
-        response = client.post(f"/games/{game_id}/move/3/0?player_id={player1_id}")
+        response = api_client.make_move(game_id, 3, 0, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -619,7 +630,7 @@ class TestEndToEndRegression:
         
         # Move 26: O plays in board 6 (bottom-left), position 1 (top-middle)
         logger.info("Move 26: O plays in bottom-left board, top-middle (6, 1)")
-        response = client.post(f"/games/{game_id}/move/6/1?player_id={player2_id}")
+        response = api_client.make_move(game_id, 6, 1, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -630,7 +641,7 @@ class TestEndToEndRegression:
         
         # Move 27: X plays in board 1 (top-middle), position 6 (bottom-left)
         logger.info("Move 27: X plays in top-middle board, bottom-left (1, 6)")
-        response = client.post(f"/games/{game_id}/move/1/6?player_id={player1_id}")
+        response = api_client.make_move(game_id, 1, 6, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -641,7 +652,7 @@ class TestEndToEndRegression:
         
         # Move 28: O plays in board 6 (bottom-left), position 2 (top-right)
         logger.info("Move 28: O plays in bottom-left board, top-right (6, 2)")
-        response = client.post(f"/games/{game_id}/move/6/2?player_id={player2_id}")
+        response = api_client.make_move(game_id, 6, 2, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -667,7 +678,7 @@ class TestEndToEndRegression:
         
         # Move 29: Since next_board is None (free choice), X can play in board 3 position 3 (middle-left)
         logger.info("Move 29: X plays in middle-left board, middle-left (3, 3)")
-        response = client.post(f"/games/{game_id}/move/3/3?player_id={player1_id}")
+        response = api_client.make_move(game_id, 3, 3, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -685,7 +696,7 @@ class TestEndToEndRegression:
         # Note: The previous move set next_board to 3, so O must play in board 3
         logger.info("Move 30: O plays in middle-left board, top-middle (3, 1)")
         logger.info(f"Current next_board before move 30: {game_state['next_board']}")
-        response = client.post(f"/games/{game_id}/move/3/1?player_id={player2_id}")
+        response = api_client.make_move(game_id, 3, 1, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -706,7 +717,7 @@ class TestEndToEndRegression:
         # Move 31: X plays in board 3, position 6 (bottom-left) to continue the winning strategy for board 3
         # X has free choice since next_board is None
         logger.info("Move 31: X plays in middle-left board, bottom-left (3, 6)")
-        response = client.post(f"/games/{game_id}/move/3/6?player_id={player1_id}")
+        response = api_client.make_move(game_id, 3, 6, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -725,7 +736,7 @@ class TestEndToEndRegression:
         
         # Move 32: O plays in board 6, position 3 (middle-left)
         logger.info("Move 32: O plays in bottom-left board, middle-left (6, 3)")
-        response = client.post(f"/games/{game_id}/move/6/3?player_id={player2_id}")
+        response = api_client.make_move(game_id, 6, 3, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -744,7 +755,7 @@ class TestEndToEndRegression:
         
         # Move 33: X plays in board 6, position 6 (bottom-left)
         logger.info("Move 33: X plays in bottom-left board, bottom-left (6, 6)")
-        response = client.post(f"/games/{game_id}/move/6/6?player_id={player1_id}")
+        response = api_client.make_move(game_id, 6, 6, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -761,7 +772,7 @@ class TestEndToEndRegression:
         
         # Now O plays in board 6 again (since next_board is 6)
         logger.info("Move 34: O plays in bottom-left board, middle-middle (6, 7)")
-        response = client.post(f"/games/{game_id}/move/6/7?player_id={player2_id}")
+        response = api_client.make_move(game_id, 6, 7, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -776,7 +787,7 @@ class TestEndToEndRegression:
         
         # Move 35: X plays in board 7, position 2 (top-right)
         logger.info("Move 35: X plays in bottom-middle board, top-right (7, 2)")
-        response = client.post(f"/games/{game_id}/move/7/2?player_id={player1_id}")
+        response = api_client.make_move(game_id, 7, 2, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -791,7 +802,7 @@ class TestEndToEndRegression:
         
         # Move 36: O plays in bottom-left board, bottom-right (6, 8)
         logger.info("Move 36: O plays in bottom-left board, bottom-right (6, 8)")
-        response = client.post(f"/games/{game_id}/move/6/8?player_id={player2_id}")
+        response = api_client.make_move(game_id, 6, 8, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -805,7 +816,7 @@ class TestEndToEndRegression:
         
         # Move 37: X plays in board 8, position 0 (top-left)
         logger.info("Move 37: X plays in bottom-right board, top-left (8, 0)")
-        response = client.post(f"/games/{game_id}/move/8/0?player_id={player1_id}")
+        response = api_client.make_move(game_id, 8, 0, player1_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -821,7 +832,7 @@ class TestEndToEndRegression:
         
         # Move 38: O plays in board 6, position 0 (top-left) to win board 6 and complete a diagonal win
         logger.info("Move 38: O plays in bottom-left board, top-left (6, 0)")
-        response = client.post(f"/games/{game_id}/move/6/0?player_id={player2_id}")
+        response = api_client.make_move(game_id, 6, 0, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -848,7 +859,7 @@ class TestEndToEndRegression:
         logger.info("Successfully completed TODO #5")
         return game_state
     
-    def _verify_elo_updates(self, player1_id, player2_id, game_state):
+    def _verify_elo_updates(self, api_client, player1_id, player2_id, game_state):
         """
         TODO #6: Verify ELO updates after game completion.
         
@@ -857,6 +868,7 @@ class TestEndToEndRegression:
         - Verify win/loss counts have been updated correctly
         
         Args:
+            api_client: The API client to use for HTTP requests
             player1_id: ID of player X
             player2_id: ID of player O
             game_state: The final game state after game completion
@@ -868,11 +880,11 @@ class TestEndToEndRegression:
         assert game_state["player_o"]["elo_change"] is not None, "Player O should have an ELO change recorded"
         
         # Get player profiles to check the updated ELO scores
-        response = client.get(f"/profile/{player1_id}")
+        response = api_client.get_profile(player1_id)
         assert response.status_code == 200
         player1_profile = response.json()
         
-        response = client.get(f"/profile/{player2_id}")
+        response = api_client.get_profile(player2_id)
         assert response.status_code == 200
         player2_profile = response.json()
         
@@ -904,32 +916,50 @@ class TestEndToEndRegression:
         
         logger.info("Successfully completed TODO #6")
     
-    def test_game_resignation(self, test_db):
+    def test_game_resignation(self, test_db, api_client):
         """Test that a player can resign from a game."""
         # Create two players
-        player1 = Player.create(
-            username="resign_player1",
-            email="resign1@example.com",
-            elo=1000
-        )
+        player1_data = {
+            "username": "resign_player1",
+            "email": "resign1@example.com",
+            "level": "INTERMEDIATE",
+            "timezone": "America/Los_Angeles",
+            "country": "US"
+        }
         
-        player2 = Player.create(
-            username="resign_player2",
-            email="resign2@example.com",
-            elo=1000
-        )
+        player2_data = {
+            "username": "resign_player2",
+            "email": "resign2@example.com",
+            "level": "INTERMEDIATE",
+            "timezone": "America/New_York",
+            "country": "US"
+        }
+        
+        # Create player 1
+        response = api_client.signup(player1_data)
+        assert response.status_code == 200
+        player1_id = response.json()["id"]
+        
+        # Create player 2
+        response = api_client.signup(player2_data)
+        assert response.status_code == 200
+        player2_id = response.json()["id"]
         
         # Create a game
-        game = Game.create(
-            player_x=player1,
-            player_o=player2,
-            current_player="X",
-            started=True,
-            last_move_time=datetime.now()
-        )
+        # Try to use the API endpoint first, but fall back to direct creation if needed
+        try:
+            response = api_client.create_game(player1_id, player2_id)
+            if response.status_code == 200:
+                game_id = response.json()["id"]
+            else:
+                raise Exception("API game creation failed")
+        except:
+            # Fall back to direct creation
+            game = api_client.direct_game_creation(player1_id, player2_id)
+            game_id = game.id
         
         # Player O resigns
-        response = client.post(f"/games/{game.id}/resign?player_id={player2.id}")
+        response = api_client.resign_game(game_id, player2_id)
         assert response.status_code == 200
         game_state = response.json()
         
@@ -939,9 +969,14 @@ class TestEndToEndRegression:
         assert game_state["player_x"]["elo_change"] is not None
         assert game_state["player_o"]["elo_change"] is not None
         
-        # Check that player stats were updated
-        player1 = Player.get(Player.id == player1.id)
-        player2 = Player.get(Player.id == player2.id)
+        # Check that player stats were updated via profiles
+        response = api_client.get_profile(player1_id)
+        assert response.status_code == 200
+        player1_profile = response.json()
         
-        assert player1.wins == 1
-        assert player2.losses == 1
+        response = api_client.get_profile(player2_id)
+        assert response.status_code == 200
+        player2_profile = response.json()
+        
+        assert player1_profile["stats"]["wins"] == 1
+        assert player2_profile["stats"]["losses"] == 1
