@@ -6,8 +6,27 @@ import os
 import signal
 import threading
 import atexit
+import sys
 
 logger = logging.getLogger(__name__)
+
+def delete_existing_db_if_exists():
+    """Delete the database file if it exists to ensure a clean state for tests.
+    
+    The backend will create a new empty database if the file doesn't exist.
+    """
+    # Determine the database path by examining the backend's db_config
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    db_path = os.path.join(backend_dir, "tictactoe.db")
+    
+    if os.path.exists(db_path):
+        try:
+            os.unlink(db_path)
+            logger.info(f"Deleted existing database file at {db_path}")
+        except Exception as e:
+            logger.warning(f"Failed to delete database file: {str(e)}")
+    else:
+        logger.info(f"No existing database file found at {db_path}")
 
 class ApiClient:
     """HTTP client for interacting with the backend API."""
@@ -171,6 +190,9 @@ class BackendServer:
 
     def start(self):
         """Start the backend server."""
+        # Delete any existing database file to ensure a clean test environment
+        delete_existing_db_if_exists()
+        
         # Start the server as a subprocess
         logger.info(f"Starting backend server with command: {self.server_command}")
         
@@ -235,8 +257,8 @@ class BackendServer:
         retry_interval = 2  # Longer interval between retries
         for i in range(max_retries):
             try:
-                logger.info(f"Checking server health at {self.server_url}/health")
-                response = requests.get(f"{self.server_url}/health", timeout=5)
+                logger.info(f"Checking server health at {self.server_url}/")
+                response = requests.get(f"{self.server_url}/", timeout=5)
                 if response.status_code == 200:
                     logger.info("Backend server is up and running")
                     return
