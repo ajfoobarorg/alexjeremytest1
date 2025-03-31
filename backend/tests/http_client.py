@@ -142,11 +142,25 @@ class BackendServer:
     """Server manager for starting and stopping the backend server."""
     
     def __init__(self, server_port=None):
+        import sys
         self.port = server_port or self._find_free_port()
-        self.server_command = f"python -m uvicorn main:app --port {self.port} --host 0.0.0.0"
+        # Get Python executable info for debugging
+        py_executable = sys.executable
+        py_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        logger.info(f"Python executable: {py_executable}, version: {py_version}")
+        
+        # Use sys.executable to get the exact Python interpreter that's running the test
+        python_cmd = py_executable  # Use the detected executable
+        logger.info(f"Using Python interpreter: {python_cmd}")
+        self.server_command = f"{python_cmd} -m uvicorn main:app --port {self.port} --host 0.0.0.0 --log-level debug --reload"
         self.server_url = f"http://localhost:{self.port}"
         self.process = None
         self.log_file = None
+        
+        # Print DEBUG information about environment
+        logger.info(f"Current directory: {os.getcwd()}")
+        logger.info(f"Environment variables: PATH={os.environ.get('PATH')}")
+        logger.info(f"Python path: {sys.path}")
         
     def _find_free_port(self):
         """Find a free port to use for the server."""
@@ -168,6 +182,40 @@ class BackendServer:
         # Get the current directory
         current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         logger.info(f"Starting server in directory: {current_dir}")
+        
+        # Test if python3 is available - this helps debug GitHub Actions issues
+        try:
+            test_result = subprocess.run(
+                "which python3", 
+                shell=True, 
+                capture_output=True, 
+                text=True,
+                check=True
+            )
+            logger.info(f"python3 found at: {test_result.stdout.strip()}")
+            
+            # Also check version
+            test_result = subprocess.run(
+                "python3 --version", 
+                shell=True, 
+                capture_output=True, 
+                text=True,
+                check=True
+            )
+            logger.info(f"python3 version: {test_result.stdout.strip()}")
+            
+            # Check if uvicorn is installed
+            test_result = subprocess.run(
+                "python3 -m pip list | grep uvicorn", 
+                shell=True, 
+                capture_output=True, 
+                text=True
+            )
+            logger.info(f"uvicorn package: {test_result.stdout.strip() if test_result.returncode == 0 else 'Not found'}")
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error checking python3: {str(e)}")
+            logger.error(f"stdout: {e.stdout}, stderr: {e.stderr}")
         
         # Set up log file for server output
         self.log_file = open('backend_server.log', 'w')
@@ -202,29 +250,111 @@ class BackendServer:
                     returncode = self.process.poll()
                     logger.error(f"Server process exited with code {returncode}")
                     
+                    # Flush the log file and reopen for reading
+                    if self.log_file:
+                        self.log_file.flush()
+                    
                     # Try to read the log file for error details
                     try:
+                        # Close and reopen to ensure we get the latest content
+                        if self.log_file:
+                            self.log_file.close()
+                            self.log_file = open('backend_server.log', 'a')
+                            
                         with open('backend_server.log', 'r') as f:
-                            log_tail = ''.join(f.readlines()[-20:])  # Last 20 lines
-                            logger.error(f"Server log tail:\n{log_tail}")
+                            log_content = f.read()
+                            # Print the entire log to console
+                            print("\n\n==== SERVER LOG START ====")
+                            print(log_content)
+                            print("==== SERVER LOG END ====\n\n")
+                            logger.error(f"Full server log:\n{log_content}")
                     except Exception as log_e:
                         logger.error(f"Failed to read log file: {str(log_e)}")
                     
                     raise Exception(f"Server process exited prematurely with code {returncode}")
             
             logger.info(f"Waiting for server to start (attempt {i+1}/{max_retries})...")
+            
+            # Every 5 attempts, check if the port is being listened on
+            if i % 5 == 0:
+                try:
+                    # Check port status using different commands depending on OS
+                    if os.name != 'nt':  # Unix/Linux/macOS
+                        # Try netstat first
+                        ns_cmd = f"netstat -tuln | grep {self.port}"
+                        netstat_result = subprocess.run(
+                            ns_cmd, 
+                            shell=True, 
+                            capture_output=True, 
+                            text=True
+                        )
+                        if netstat_result.returncode == 0:
+                            logger.info(f"Port {self.port} status: {netstat_result.stdout.strip()}")
+                        else:
+                            # Try ss if netstat fails
+                            ss_cmd = f"ss -tuln | grep {self.port}"
+                            ss_result = subprocess.run(
+                                ss_cmd, 
+                                shell=True, 
+                                capture_output=True, 
+                                text=True
+                            )
+                            logger.info(f"Port {self.port} status: {ss_result.stdout.strip() if ss_result.returncode == 0 else 'Not found'}")
+                    else:
+                        # Windows
+                        netstat_result = subprocess.run(
+                            f"netstat -an | findstr {self.port}", 
+                            shell=True, 
+                            capture_output=True, 
+                            text=True
+                        )
+                        logger.info(f"Port {self.port} status: {netstat_result.stdout.strip() if netstat_result.returncode == 0 else 'Not found'}")
+                except Exception as e:
+                    logger.error(f"Error checking port status: {str(e)}")
+                
+                # Check if the server process is still running
+                if self.process and self.process.poll() is not None:
+                    logger.error(f"Server process exited with code {self.process.poll()}")
+                    
+                    # Display log content
+                    if self.log_file:
+                        self.log_file.flush()
+                        
+                    try:
+                        with open('backend_server.log', 'r') as f:
+                            log_content = f.read()
+                            print("\n\n==== SERVER LOG START ====")
+                            print(log_content)
+                            print("==== SERVER LOG END ====\n\n")
+                    except Exception as log_e:
+                        logger.error(f"Failed to read log file: {str(log_e)}")
+            
             time.sleep(retry_interval)
             
         # If we got here, server didn't start in time
         logger.error("Server startup timed out. Checking server log...")
         
+        # Flush and close the log file
+        if self.log_file:
+            self.log_file.flush()
+            self.log_file.close()
+            self.log_file = None
+        
         # Try to read log file for error details
         try:
             with open('backend_server.log', 'r') as f:
                 log_content = f.read()
+                # Print the entire log to console
+                print("\n\n==== SERVER LOG START ====")
+                print(log_content)
+                print("==== SERVER LOG END ====\n\n")
                 logger.error(f"Server log:\n{log_content}")
         except Exception as e:
             logger.error(f"Failed to read log file: {str(e)}")
+        
+        # Print the process state
+        if self.process:
+            print(f"Process state: {self.process.poll()}")
             
         raise Exception("Failed to start backend server after maximum retries")
 
