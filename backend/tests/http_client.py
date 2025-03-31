@@ -66,26 +66,11 @@ class ApiClient:
         )
     
     def create_game(self, player_x_id, player_o_id):
-        """Create a new game between two players."""
-        # This endpoint might not exist in the current API
-        # It's included for completeness in case it's added later
-        return self.session.post(
-            f"{self.base_url}/games/create",
-            json={"player_x_id": player_x_id, "player_o_id": player_o_id}
-        )
-    
-    def direct_game_creation(self, player_x_id, player_o_id):
         """Create a game through the matchmaking system.
         
-        For the HTTP client, we don't have access to the database directly,
-        so we use the matchmaking system to create a game, like a real frontend client would.
+        For the HTTP client, we use the matchmaking system to create a game,
+        like a real frontend client would.
         """
-        # First try the direct API endpoint
-        response = self.create_game(player_x_id, player_o_id)
-        if response.status_code == 200:
-            return response.json()
-            
-        print("No direct games/create endpoint available. Using matchmaking system...")
         import time
         
         # Have both players join matchmaking

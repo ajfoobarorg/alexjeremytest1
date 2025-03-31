@@ -104,16 +104,10 @@ def _create_game_and_verify(client, player1_id, player2_id):
     logger.info("Starting game creation")
     
     # Create a game through matchmaking
-    response = client.create_game(player1_id, player2_id)
-    if response.status_code == 200:
-        game_id = response.json()["id"]
-        logger.info(f"Created game with ID: {game_id} through API endpoint")
-    else:
-        # If API endpoint fails, use matchmaking
-        logger.info("API game creation failed, using matchmaking system...")
-        game_data = client.direct_game_creation(player1_id, player2_id)
-        game_id = game_data["id"]
-        logger.info(f"Created game with ID: {game_id} through matchmaking")
+    logger.info("Creating game through matchmaking system...")
+    game_data = client.create_game(player1_id, player2_id)
+    game_id = game_data["id"]
+    logger.info(f"Created game with ID: {game_id}")
     
     # Verify initial game state
     response = client.get_game(game_id)
@@ -953,15 +947,9 @@ def _test_game_resignation(client):
     assert response.status_code == 200
     player2_id = response.json()["id"]
     
-    # Create a game
-    # Try to use the API endpoint first, but fall back to matchmaking if needed
-    response = client.create_game(player1_id, player2_id)
-    if response.status_code == 200:
-        game_id = response.json()["id"]
-    else:
-        # Fall back to matchmaking
-        game_data = client.direct_game_creation(player1_id, player2_id)
-        game_id = game_data["id"]
+    # Create a game through matchmaking
+    game_data = client.create_game(player1_id, player2_id)
+    game_id = game_data["id"]
     
     # Get the game details to find out which player is which
     response = client.get_game(game_id)
