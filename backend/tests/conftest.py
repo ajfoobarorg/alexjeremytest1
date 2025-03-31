@@ -18,14 +18,27 @@ def test_db():
     # Store the original database
     original_db = db.database
     
-    # Close the current connection if open
-    if not db.is_closed():
-        db.close()
+    # Force close any existing connections (main app might have initialized it)
+    for _ in range(3):  # Try multiple times to ensure it's closed
+        try:
+            if not db.is_closed():
+                db.close()
+        except:
+            pass
     
     # Set up the test database
     test_db = SqliteDatabase(test_db_path)
+    # Replace the database in the db instance
+    db._Database__database = test_db
     db.bind([Player, Game], bind_refs=False, bind_backrefs=False)
-    db.connect()
+    
+    try:
+        db.connect(reuse_if_open=True)
+    except:
+        # If connection fails, try one more time after forcing a close
+        if not db.is_closed():
+            db.close()
+        db.connect()
     
     # Drop tables if they exist and create new ones
     db.drop_tables([Player, Game], safe=True)
@@ -35,10 +48,14 @@ def test_db():
     yield None
     
     # Cleanup after test
-    if not db.is_closed():
-        db.close()
+    try:
+        if not db.is_closed():
+            db.close()
+    except:
+        pass
     
-    # Restore the original database
+    # Restore the original database connection
+    db._Database__database = original_db
     db.bind([Player, Game], bind_refs=False, bind_backrefs=False)
     
     os.close(test_db_fd)
@@ -122,9 +139,29 @@ def http_client(real_backend_server):
     return ApiClient(real_backend_server.server_url)
 
 @pytest.fixture
-def test_client(no_backend_server):
+def test_client(no_backend_server, monkeypatch):
     """Create a TestClient wrapper for in-process testing."""
+    # Patch initialize_db function to avoid re-initializing the database
+    import sys
+    import models
+    
+    # Save the original initialize_db function
+    original_initialize_db = models.initialize_db
+    
+    # Replace it with a no-op function
+    def mock_initialize_db():
+        pass
+    
+    # Apply the patch
+    monkeypatch.setattr(models, "initialize_db", mock_initialize_db)
+    
+    # Now import the app (which would normally call initialize_db on import)
     from fastapi.testclient import TestClient
+    
+    # Force reload the main module to pick up our patch
+    if "main" in sys.modules:
+        del sys.modules["main"]
+    
     from main import app
     
     print("\n🔍 Creating TestClient for in-process testing...")
