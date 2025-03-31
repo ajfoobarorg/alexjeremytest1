@@ -135,7 +135,7 @@ def no_backend_server():
 def http_client(real_backend_server):
     """Create a real HTTP client for tests against a running server."""
     from tests.http_client import ApiClient
-    print("\n🌐 Creating HTTP client for real server testing...")
+    print(f"\n🌐 Creating HTTP client for real server testing on port {real_backend_server.port}...")
     return ApiClient(real_backend_server.server_url)
 
 @pytest.fixture

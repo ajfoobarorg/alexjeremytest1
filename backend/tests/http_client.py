@@ -141,11 +141,19 @@ class ApiClient:
 class BackendServer:
     """Server manager for starting and stopping the backend server."""
     
-    def __init__(self, server_command="cd backend && python -m uvicorn main:app --reload", 
-                 server_url="http://localhost:8000"):
-        self.server_command = server_command
-        self.server_url = server_url
+    def __init__(self, server_port=None):
+        self.port = server_port or self._find_free_port()
+        self.server_command = f"python -m uvicorn main:app --port {self.port} --host 0.0.0.0"
+        self.server_url = f"http://localhost:{self.port}"
         self.process = None
+        self.log_file = None
+        
+    def _find_free_port(self):
+        """Find a free port to use for the server."""
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('', 0))
+            return s.getsockname()[1]
 
     def start(self):
         """Start the backend server."""
@@ -157,9 +165,20 @@ class BackendServer:
         if os.name != 'nt':  # Unix/Linux/macOS
             kwargs['preexec_fn'] = os.setsid  # Use process group for clean termination
         
+        # Get the current directory
+        current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        logger.info(f"Starting server in directory: {current_dir}")
+        
+        # Set up log file for server output
+        self.log_file = open('backend_server.log', 'w')
+        logger.info(f"Server output will be logged to backend_server.log")
+        
         self.process = subprocess.Popen(
             self.server_command, 
             shell=True,
+            cwd=current_dir,
+            stdout=self.log_file,
+            stderr=self.log_file,
             **kwargs
         )
         
@@ -168,17 +187,46 @@ class BackendServer:
         retry_interval = 2  # Longer interval between retries
         for i in range(max_retries):
             try:
-                response = requests.get(f"{self.server_url}/health")
+                logger.info(f"Checking server health at {self.server_url}/health")
+                response = requests.get(f"{self.server_url}/health", timeout=5)
                 if response.status_code == 200:
                     logger.info("Backend server is up and running")
                     return
-            except requests.RequestException:
-                pass
+                else:
+                    logger.warning(f"Server returned status code {response.status_code}")
+            except requests.RequestException as e:
+                logger.warning(f"Health check failed: {str(e)}")
+                
+                # Check if process is still running
+                if self.process.poll() is not None:
+                    returncode = self.process.poll()
+                    logger.error(f"Server process exited with code {returncode}")
+                    
+                    # Try to read the log file for error details
+                    try:
+                        with open('backend_server.log', 'r') as f:
+                            log_tail = ''.join(f.readlines()[-20:])  # Last 20 lines
+                            logger.error(f"Server log tail:\n{log_tail}")
+                    except Exception as log_e:
+                        logger.error(f"Failed to read log file: {str(log_e)}")
+                    
+                    raise Exception(f"Server process exited prematurely with code {returncode}")
             
             logger.info(f"Waiting for server to start (attempt {i+1}/{max_retries})...")
             time.sleep(retry_interval)
             
-        raise Exception("Failed to start backend server")
+        # If we got here, server didn't start in time
+        logger.error("Server startup timed out. Checking server log...")
+        
+        # Try to read log file for error details
+        try:
+            with open('backend_server.log', 'r') as f:
+                log_content = f.read()
+                logger.error(f"Server log:\n{log_content}")
+        except Exception as e:
+            logger.error(f"Failed to read log file: {str(e)}")
+            
+        raise Exception("Failed to start backend server after maximum retries")
 
     def stop(self):
         """Stop the backend server."""
@@ -209,6 +257,14 @@ class BackendServer:
                     pass
                     
             self.process = None
+            
+            # Close log file if it's open
+            if self.log_file:
+                try:
+                    self.log_file.close()
+                except:
+                    pass
+                self.log_file = None
 
 
 # Singleton server instance to ensure we only start one server
@@ -218,12 +274,11 @@ def get_server():
     """Get the backend server instance (singleton)."""
     global _server_instance
     if _server_instance is None:
-        server_command = os.environ.get(
-            "BACKEND_SERVER_COMMAND", 
-            "cd backend && python -m uvicorn main:app --reload"
-        )
-        server_url = os.environ.get("BACKEND_URL", "http://localhost:8000")
-        _server_instance = BackendServer(server_command, server_url)
+        # Use environment port if specified, otherwise dynamic
+        server_port = os.environ.get("BACKEND_PORT")
+        if server_port:
+            server_port = int(server_port)
+        _server_instance = BackendServer(server_port)
     return _server_instance
 
 def start_server_thread():
