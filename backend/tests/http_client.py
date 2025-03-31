@@ -177,10 +177,17 @@ class BackendServer:
     def stop(self):
         """Stop the backend server."""
         if self.process:
-            logger.info("Stopping backend server")
+            print("🛑 Stopping backend server...")
             # Kill the entire process group
-            os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-            self.process.wait()
+            try:
+                os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                self.process.wait(timeout=5)
+            except:
+                # If anything goes wrong, try SIGKILL
+                try:
+                    os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
+                except:
+                    pass
             self.process = None
 
 
