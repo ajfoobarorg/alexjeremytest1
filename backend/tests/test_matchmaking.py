@@ -34,7 +34,7 @@ class TestMatchmaking:
         assert not MatchmakingService.is_player_in_queue(sample_players[1].id)
 
     @freeze_time("2024-01-01 12:00:00")
-    def test_match_acceptance_timeout(self):
+    def test_match_acceptance_timeout(self, test_db):
         """Test that matches expire if not accepted in time."""
         player1 = Player.create(
             username="player1",

@@ -1,6 +1,5 @@
 import pytest
 import logging
-from datetime import datetime
 
 from schemas import PlayerLevel
 
@@ -8,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 def _create_users_and_verify(client):
     """
-    TODO #1: Create users and verify their profiles.
+    Create users and verify their profiles.
     
     - Create two users with different skill levels
     - Verify user profiles and initial ELO ratings
@@ -21,7 +20,7 @@ def _create_users_and_verify(client):
     Returns:
         tuple: (player1_id, player2_id) - The IDs of the created players
     """
-    logger.info("Starting TODO #1: User creation and authentication")
+    logger.info("Starting user creation and authentication")
     
     # Create two players with different skill levels
     player1_data = {
@@ -84,12 +83,12 @@ def _create_users_and_verify(client):
     assert "games_today" in stats
     assert "players_online" in stats
     
-    logger.info("Successfully completed TODO #1")
+    logger.info("Successfully completed user creation")
     return player1_id, player2_id
     
 def _create_game_and_verify(client, player1_id, player2_id):
     """
-    TODO #2: Create a game and verify its initial state.
+    Create a game and verify its initial state.
     
     - Create a game using the API
     - Verify initial game state
@@ -102,29 +101,13 @@ def _create_game_and_verify(client, player1_id, player2_id):
     Returns:
         str: The ID of the created game
     """
-    logger.info("Starting TODO #2: Game creation")
+    logger.info("Starting game creation")
     
-    # Try to create a game through the API first
-    try:
-        # If the server has a create game endpoint
-        response = client.create_game(player1_id, player2_id)
-        if response.status_code == 200:
-            game_id = response.json()["id"]
-            logger.info(f"Created game with ID: {game_id} through API endpoint")
-        else:
-            # Fall back to direct creation
-            raise Exception("API game creation failed")
-    except:
-        # If no API endpoint, use the direct method in our wrapper
-        # This works for the TestClientWrapper but not for real HTTP clients
-        try:
-            game_data = client.direct_game_creation(player1_id, player2_id)
-            game_id = game_data["id"]
-            logger.info(f"Created game with ID: {game_id} through direct creation")
-        except Exception as e:
-            # This would fail with a real HTTP client without a create endpoint
-            logger.error(f"Failed to create game: {str(e)}")
-            raise
+    # Create a game through matchmaking
+    logger.info("Creating game through matchmaking system...")
+    game_data = client.create_game(player1_id, player2_id)
+    game_id = game_data["id"]
+    logger.info(f"Created game with ID: {game_id}")
     
     # Verify initial game state
     response = client.get_game(game_id)
@@ -157,13 +140,13 @@ def _create_game_and_verify(client, player1_id, player2_id):
     # Check that meta-board is empty at the start
     assert all(cell == "" for cell in game_state["meta_board"])
     
-    logger.info("Successfully completed TODO #2")
+    logger.info("Successfully completed game creation")
     # Return the game ID and the actual player X and O IDs
     return game_id, actual_player_x_id, actual_player_o_id
     
 def _play_initial_moves(client, game_id, player1_id, player2_id):
     """
-    TODO #3: Play initial moves and verify game state after each move.
+    Play initial moves and verify game state after each move.
     
     - Make several valid moves, alternating between players
     - Verify the game state is updated correctly
@@ -178,7 +161,7 @@ def _play_initial_moves(client, game_id, player1_id, player2_id):
     Returns:
         dict: The game state after the moves
     """
-    logger.info("Starting TODO #3: Play initial moves")
+    logger.info("Starting initial moves")
     
     # Move 1: X plays in the center of the center board (board 4, position 4)
     logger.info("Move 1: X plays in center of center board (4, 4)")
@@ -237,12 +220,12 @@ def _play_initial_moves(client, game_id, player1_id, player2_id):
     for board_index in range(9):
         assert game_state["meta_board"][board_index] == ""
     
-    logger.info("Successfully completed TODO #3")
+    logger.info("Successfully completed initial moves")
     return game_state
     
 def _win_subboard(client, game_id, player1_id, player2_id):
     """
-    TODO #4: Win a sub-board.
+    Win a sub-board.
     
     - Make moves to have player X win board 2 (top-right board)
     - Verify the sub-board win is reflected in the meta-board state
@@ -257,7 +240,7 @@ def _win_subboard(client, game_id, player1_id, player2_id):
     Returns:
         dict: The game state after winning a sub-board
     """
-    logger.info("Starting TODO #4: Win a sub-board")
+    logger.info("Starting sub-board win sequence")
     
     # Move 5: X plays in top-right board (board 2), center (2, 4)
     # Following the next_board constraint (next_board = 2 from previous move)
@@ -548,12 +531,12 @@ def _win_subboard(client, game_id, player1_id, player2_id):
     # Verify that the turn has changed
     assert game_state["current_player"] == "O"
     
-    logger.info("Successfully completed TODO #4")
+    logger.info("Successfully completed sub-board win")
     return game_state
     
 def _complete_game(client, game_id, player1_id, player2_id, game_state):
     """
-    TODO #5: Complete the game with a deterministic winning strategy.
+    Complete the game with a deterministic winning strategy.
     
     - Make specific moves to have X win boards 0, 3, and 6 (left column)
     - Verify the game is marked as completed with X as the winner
@@ -569,7 +552,7 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     Returns:
         dict: The final game state
     """
-    logger.info("Starting TODO #5: Complete the game")
+    logger.info("Starting game completion")
     
     # After move 23, O's turn:
     # - O has won boards 2 and 4
@@ -648,10 +631,10 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     # X has already won board 0
     # X has already played at position 0 of board 3 and in the center of board 6
     # We just need 2 more moves in board 3 and 1 more move in board 6
-    logger.info(f"ALEX After move 28, meta_board state: {game_state['meta_board']}")
-    logger.info(f"ALEX After move 28, board 3 state: {game_state['boards'][3]}")
-    logger.info(f"ALEX After move 28, board 6 state: {game_state['boards'][6]}")
-    logger.info(f"ALEX After move 28, next_board: {game_state['next_board']}")
+    logger.info(f"After move 28, meta_board state: {game_state['meta_board']}")
+    logger.info(f"After move 28, board 3 state: {game_state['boards'][3]}")
+    logger.info(f"After move 28, board 6 state: {game_state['boards'][6]}")
+    logger.info(f"After move 28, next_board: {game_state['next_board']}")
     
     # Move 29: Since next_board is None (free choice), X can play in board 3 position 3 (middle-left)
     logger.info("Move 29: X plays in middle-left board, middle-left (3, 3)")
@@ -660,9 +643,9 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     game_state = response.json()
     
     # Log the detailed state for debugging
-    logger.info(f"DETAILED: After move 29, game_state['boards'][3] = {game_state['boards'][3]}")
-    logger.info(f"DETAILED: After move 29, next_board = {game_state['next_board']}")
-    logger.info(f"DETAILED: After move 29, meta_board = {game_state['meta_board']}")
+    logger.info(f"After move 29, game_state['boards'][3] = {game_state['boards'][3]}")
+    logger.info(f"After move 29, next_board = {game_state['next_board']}")
+    logger.info(f"After move 29, meta_board = {game_state['meta_board']}")
     
     # Verify move 29 results
     assert game_state["current_player"] == "O"  # Turn changed to O
@@ -678,11 +661,11 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     game_state = response.json()
     
     # Log detailed state for debugging
-    logger.info(f"DETAILED: After move 30, response status code: {response.status_code}")
-    logger.info(f"DETAILED: After move 30, game_state['boards'][3] = {game_state['boards'][3]}")
-    logger.info(f"DETAILED: After move 30, next_board = {game_state['next_board']}")
-    logger.info(f"DETAILED: After move 30, meta_board = {game_state['meta_board']}")
-    logger.info(f"DETAILED: After move 30, current_player = {game_state['current_player']}")
+    logger.info(f"After move 30, response status code: {response.status_code}")
+    logger.info(f"After move 30, game_state['boards'][3] = {game_state['boards'][3]}")
+    logger.info(f"After move 30, next_board = {game_state['next_board']}")
+    logger.info(f"After move 30, meta_board = {game_state['meta_board']}")
+    logger.info(f"After move 30, current_player = {game_state['current_player']}")
     
     # Verify move 30 results
     assert game_state["current_player"] == "X"  # Turn changed to X
@@ -699,9 +682,9 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     game_state = response.json()
     
     # Log detailed state for debugging
-    logger.info(f"DETAILED: After move 31, game_state['boards'][3] = {game_state['boards'][3]}")
-    logger.info(f"DETAILED: After move 31, next_board = {game_state['next_board']}")
-    logger.info(f"DETAILED: After move 31, meta_board = {game_state['meta_board']}")
+    logger.info(f"After move 31, game_state['boards'][3] = {game_state['boards'][3]}")
+    logger.info(f"After move 31, next_board = {game_state['next_board']}")
+    logger.info(f"After move 31, meta_board = {game_state['meta_board']}")
     
     # Verify move 31 results
     assert game_state["current_player"] == "O"  # Turn changed to O
@@ -718,10 +701,10 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     game_state = response.json()
     
     # Log detailed state for debugging
-    logger.info(f"DETAILED: After move 32, game_state['boards'][6] = {game_state['boards'][6]}")
-    logger.info(f"DETAILED: After move 32, next_board = {game_state['next_board']}")
-    logger.info(f"DETAILED: After move 32, meta_board = {game_state['meta_board']}")
-    logger.info(f"DETAILED: After move 32, current_player = {game_state['current_player']}")
+    logger.info(f"After move 32, game_state['boards'][6] = {game_state['boards'][6]}")
+    logger.info(f"After move 32, next_board = {game_state['next_board']}")
+    logger.info(f"After move 32, meta_board = {game_state['meta_board']}")
+    logger.info(f"After move 32, current_player = {game_state['current_player']}")
     
     # Verify move 32 results
     assert game_state["current_player"] == "X"  # Turn changed to X
@@ -737,11 +720,11 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     game_state = response.json()
     
     # Log detailed state for debugging
-    logger.info(f"DETAILED: After move 33, game_state['boards'][6] = {game_state['boards'][6]}")
-    logger.info(f"DETAILED: After move 33, next_board = {game_state['next_board']}")
-    logger.info(f"DETAILED: After move 33, meta_board = {game_state['meta_board']}")
-    logger.info(f"DETAILED: After move 33, game_over = {game_state['game_over']}")
-    logger.info(f"DETAILED: After move 33, winner = {game_state['winner']}")
+    logger.info(f"After move 33, game_state['boards'][6] = {game_state['boards'][6]}")
+    logger.info(f"After move 33, next_board = {game_state['next_board']}")
+    logger.info(f"After move 33, meta_board = {game_state['meta_board']}")
+    logger.info(f"After move 33, game_over = {game_state['game_over']}")
+    logger.info(f"After move 33, winner = {game_state['winner']}")
     
     # Verify move 33 results
     assert game_state["boards"][6][6] == "X"  # X is placed in bottom-left of board 6
@@ -754,9 +737,9 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     game_state = response.json()
     
     # Log detailed state for debugging
-    logger.info(f"DETAILED: After move 34, game_state['boards'][6] = {game_state['boards'][6]}")
-    logger.info(f"DETAILED: After move 34, next_board = {game_state['next_board']}")
-    logger.info(f"DETAILED: After move 34, meta_board = {game_state['meta_board']}")
+    logger.info(f"After move 34, game_state['boards'][6] = {game_state['boards'][6]}")
+    logger.info(f"After move 34, next_board = {game_state['next_board']}")
+    logger.info(f"After move 34, meta_board = {game_state['meta_board']}")
     
     # Verify move 34 results
     assert game_state["boards"][6][7] == "O"  # O is placed in bottom-middle of board 6
@@ -769,9 +752,9 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     game_state = response.json()
     
     # Log detailed state for debugging
-    logger.info(f"DETAILED: After move 35, game_state['boards'][7] = {game_state['boards'][7]}")
-    logger.info(f"DETAILED: After move 35, next_board = {game_state['next_board']}")
-    logger.info(f"DETAILED: After move 35, meta_board = {game_state['meta_board']}")
+    logger.info(f"After move 35, game_state['boards'][7] = {game_state['boards'][7]}")
+    logger.info(f"After move 35, next_board = {game_state['next_board']}")
+    logger.info(f"After move 35, meta_board = {game_state['meta_board']}")
     
     # Verify move 35 results
     assert game_state["boards"][7][2] == "X"  # X is placed in top-right of board 7
@@ -784,9 +767,9 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     game_state = response.json()
     
     # Log detailed state for debugging
-    logger.info(f"DETAILED: After move 36, game_state['boards'][6] = {game_state['boards'][6]}")
-    logger.info(f"DETAILED: After move 36, next_board = {game_state['next_board']}")
-    logger.info(f"DETAILED: After move 36, meta_board = {game_state['meta_board']}")
+    logger.info(f"After move 36, game_state['boards'][6] = {game_state['boards'][6]}")
+    logger.info(f"After move 36, next_board = {game_state['next_board']}")
+    logger.info(f"After move 36, meta_board = {game_state['meta_board']}")
     
     # Verify the next_board constraint after move 36
     assert game_state["next_board"] == 8, "Next board should be 8 (since O played in position 8 of board 6)"
@@ -798,9 +781,9 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     game_state = response.json()
     
     # Log detailed state for debugging
-    logger.info(f"DETAILED: After move 37, game_state['boards'][8] = {game_state['boards'][8]}")
-    logger.info(f"DETAILED: After move 37, next_board = {game_state['next_board']}")
-    logger.info(f"DETAILED: After move 37, meta_board = {game_state['meta_board']}")
+    logger.info(f"After move 37, game_state['boards'][8] = {game_state['boards'][8]}")
+    logger.info(f"After move 37, next_board = {game_state['next_board']}")
+    logger.info(f"After move 37, meta_board = {game_state['meta_board']}")
     
     # Verify move 37 results
     assert game_state["boards"][8][0] == "X", "X should be placed in top-left of board 8"
@@ -814,11 +797,11 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     game_state = response.json()
     
     # Log detailed state for debugging
-    logger.info(f"DETAILED: After move 38, game_state['boards'][6] = {game_state['boards'][6]}")
-    logger.info(f"DETAILED: After move 38, next_board = {game_state['next_board']}")
-    logger.info(f"DETAILED: After move 38, meta_board = {game_state['meta_board']}")
-    logger.info(f"DETAILED: After move 38, game_over = {game_state['game_over']}")
-    logger.info(f"DETAILED: After move 38, winner = {game_state['winner']}")
+    logger.info(f"After move 38, game_state['boards'][6] = {game_state['boards'][6]}")
+    logger.info(f"After move 38, next_board = {game_state['next_board']}")
+    logger.info(f"After move 38, meta_board = {game_state['meta_board']}")
+    logger.info(f"After move 38, game_over = {game_state['game_over']}")
+    logger.info(f"After move 38, winner = {game_state['winner']}")
     
     # Verify move 38 results - O should have won board 6
     assert game_state["boards"][6][0] == "O", "O should be placed in top-left of board 6"
@@ -833,12 +816,12 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     assert game_state["meta_board"][4] == "O", "O should have won board 4" 
     assert game_state["meta_board"][6] == "O", "O should have won board 6"
     
-    logger.info("Successfully completed TODO #5")
+    logger.info("Successfully completed game")
     return game_state
     
 def _verify_elo_updates(client, player1_id, player2_id, game_state, player_x_won=False):
     """
-    TODO #6: Verify ELO updates after game completion.
+    Verify ELO updates after game completion.
     
     - Verify both players' profiles have been updated with new ELO scores
     - Verify the winner's ELO increased and the loser's ELO decreased
@@ -851,7 +834,7 @@ def _verify_elo_updates(client, player1_id, player2_id, game_state, player_x_won
         game_state: The final game state after game completion
         player_x_won: Whether player X won the game
     """
-    logger.info("Starting TODO #6: Verify ELO updates")
+    logger.info("Starting ELO update verification")
     
     # Verify that the game includes ELO change information
     assert game_state["player_x"]["elo_change"] is not None, "Player X should have an ELO change recorded"
@@ -929,9 +912,9 @@ def _verify_elo_updates(client, player1_id, player2_id, game_state, player_x_won
     assert player1_profile["stats"]["elo"] == expected_player1_elo, "Player 1 final ELO should match initial ELO + change"
     assert player2_profile["stats"]["elo"] == expected_player2_elo, "Player 2 final ELO should match initial ELO + change"
     
-    logger.info("Successfully completed TODO #6")
+    logger.info("Successfully completed ELO verification")
 
-def _test_game_resignation(client, test_db):
+def _test_game_resignation(client):
     """Test that a player can resign from a game."""
     # Create two players
     player1_data = {
@@ -964,18 +947,9 @@ def _test_game_resignation(client, test_db):
     assert response.status_code == 200
     player2_id = response.json()["id"]
     
-    # Create a game
-    # Try to use the API endpoint first, but fall back to direct creation if needed
-    try:
-        response = client.create_game(player1_id, player2_id)
-        if response.status_code == 200:
-            game_id = response.json()["id"]
-        else:
-            raise Exception("API game creation failed")
-    except:
-        # Fall back to direct creation
-        game_data = client.direct_game_creation(player1_id, player2_id)
-        game_id = game_data["id"]
+    # Create a game through matchmaking
+    game_data = client.create_game(player1_id, player2_id)
+    game_id = game_data["id"]
     
     # Get the game details to find out which player is which
     response = client.get_game(game_id)
@@ -1014,60 +988,40 @@ def _test_game_resignation(client, test_db):
         assert player2_profile["stats"]["wins"] == 1, "Player 2 (X) should have 1 win"
         assert player1_profile["stats"]["losses"] == 1, "Player 1 (O) should have 1 loss"
 
-def run_full_game_flow(test_db, client):
+def run_full_game_flow(client):
     """
     Complete end-to-end test of the application.
     
     Test plan divided into manageable steps with each step in its own method:
     
-    TODO #1: User creation and authentication
-    TODO #2: Game creation
-    TODO #3: Play initial moves
-    TODO #4: Win a sub-board
-    TODO #5: Complete the game
-    TODO #6: Verify ELO updates
+    1. User creation and authentication
+    2. Game creation
+    3. Play initial moves
+    4. Win a sub-board
+    5. Complete the game
+    6. Verify ELO updates
     """
-    # TODO #1: User creation and authentication
+    # 1. User creation and authentication
     player1_id, player2_id = _create_users_and_verify(client)
     
-    # TODO #2: Game creation
+    # 2. Game creation
     # This returns the game_id and the assigned player IDs (which may be swapped from original)
     game_id, player_x_id, player_o_id = _create_game_and_verify(client, player1_id, player2_id)
     
-    # TODO #3: Play initial moves - use actual X and O IDs from matchmaking
+    # 3. Play initial moves - use actual X and O IDs from matchmaking
     _play_initial_moves(client, game_id, player_x_id, player_o_id)
     
-    # TODO #4: Win a sub-board - use actual X and O IDs from matchmaking
+    # 4. Win a sub-board - use actual X and O IDs from matchmaking
     game_state = _win_subboard(client, game_id, player_x_id, player_o_id)
     
-    # TODO #5: Complete the game - use actual X and O IDs from matchmaking
+    # 5. Complete the game - use actual X and O IDs from matchmaking
     final_game_state = _complete_game(client, game_id, player_x_id, player_o_id, game_state)
     
-    # TODO #6: Verify ELO updates
+    # 6. Verify ELO updates
     # Here we pass the original player1_id and player2_id for profile checks
     # but also pass the assigned roles so the test knows which player won
     _verify_elo_updates(client, player1_id, player2_id, final_game_state, 
                         player_x_won=(final_game_state["winner"] == "X"))
-
-@pytest.mark.e2e
-class TestEndToEndRegressionWithTestClient:
-    """End-to-end regression test using the FastAPI TestClient.
-    
-    This test runs with the in-process TestClient for fast execution.
-    """
-    
-    def test_full_game_flow_with_test_client(self, test_db, test_client):
-        """Run the full game flow using the TestClient."""
-        print("\n🔵 Running regression test with FastAPI TestClient (in-process)")
-        run_full_game_flow(test_db, test_client)
-        print("\n✅ TestClient regression test completed successfully!")
-    
-    def test_game_resignation_with_test_client(self, test_db, test_client):
-        """Test that a player can resign from a game using TestClient."""
-        print("\n🔵 Running game resignation test with FastAPI TestClient (in-process)")
-        _test_game_resignation(test_client, test_db)
-        print("\n✅ TestClient game resignation test completed successfully!")
-
 
 @pytest.mark.e2e
 @pytest.mark.http
@@ -1077,14 +1031,14 @@ class TestEndToEndRegressionWithHttpClient:
     This test runs against a real server for true end-to-end testing.
     """
     
-    def test_full_game_flow_with_http_client(self, test_db, http_client):
+    def test_full_game_flow_with_http_client(self, http_client):
         """Run the full game flow using the HTTP client against a real server."""
         print("\n🔴 Running regression test with real HTTP client (end-to-end)")
-        run_full_game_flow(test_db, http_client)
+        run_full_game_flow(http_client)
         print("\n✅ HTTP client regression test completed successfully!")
     
-    def test_game_resignation_with_http_client(self, test_db, http_client):
+    def test_game_resignation_with_http_client(self, http_client):
         """Test that a player can resign from a game using HTTP client."""
         print("\n🔴 Running game resignation test with real HTTP client (end-to-end)")
-        _test_game_resignation(http_client, test_db)
+        _test_game_resignation(http_client)
         print("\n✅ HTTP client game resignation test completed successfully!")
