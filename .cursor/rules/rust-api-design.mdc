@@ -1,0 +1,287 @@
+---
+description: Rust API Design and Crate Structure
+globs: **/*.rs
+alwaysApply: true
+---
+# Rust API Design and Crate Structure
+
+Guidelines for designing ergonomic, maintainable Rust APIs and organizing crates.
+
+<rule>
+name: rust_api_design
+description: Best practices for designing Rust APIs and structuring crates
+
+filters:
+  - type: file_extension
+    pattern: "\\.rs$"
+  - type: event
+    pattern: "file_create|file_edit"
+
+actions:
+  - type: suggest
+    message: |
+      ## Rust API Design Best Practices
+      
+      1. **Follow Rust naming conventions**:
+         - `snake_case` for functions, methods, variables, modules
+         - `CamelCase` for types, traits, and enum variants
+         - `SCREAMING_SNAKE_CASE` for constants and statics
+      
+      2. **Design for ergonomics**:
+         - Use builder patterns for complex object creation
+         - Implement standard traits (From/Into, Default, etc.)
+         - Provide convenience methods and constructors
+      
+      3. **Structure public API deliberately**:
+         - Use `pub(crate)` and visibility modifiers appropriately
+         - Re-export common items from the crate root
+         - Use the facade pattern with `pub use`
+      
+      4. **Organize crate structure**:
+         - One concept per module
+         - Group related functionality
+         - Use `lib.rs` as the stable API entry point
+      
+      5. **Document thoroughly**:
+         - Add doc comments for all public items
+         - Include examples in documentation
+         - Document panics, errors, and safety requirements
+      
+      6. **Design for extensibility**:
+         - Use the newtype pattern for type safety
+         - Implement traits for extensibility
+         - Consider sealed traits for controlled extension
+      
+      7. **Version compatibility**:
+         - Follow semantic versioning
+         - Use feature flags for optional functionality
+         - Mark unstable APIs with `#[doc(hidden)]` or appropriate attributes
+
+examples:
+  - input: |
+      // Bad: Poor API design with confused visibility
+      mod utils {
+          pub fn do_something() {}
+          pub fn do_something_else() {}
+      }
+      
+      // Functions directly in root
+      pub fn some_function() {}
+      pub fn another_function() {}
+      
+      // Bad: No documentation or consistent naming
+      pub struct user {
+          name: String,
+          Id: u64,
+      }
+      
+      impl user {
+          pub fn CreateNew(n: String, id: u64) -> Self {
+              user { name: n, Id: id }
+          }
+      }
+    output: |
+      // Good: Structured API with clear organization
+      
+      // lib.rs - API facade pattern with re-exports
+      pub use self::user::{User, UserBuilder};
+      pub use self::error::Error;
+      
+      mod user;
+      mod error;
+      mod utils;
+      
+      // user.rs - One concept per file, with documentation
+      /// A user in the system.
+      ///
+      /// # Examples
+      ///
+      /// ```
+      /// let user = User::new("Alice", 42);
+      /// assert_eq!(user.name(), "Alice");
+      /// ```
+      #[derive(Debug, Clone, PartialEq, Eq)]
+      pub struct User {
+          name: String,
+          id: u64,
+      }
+      
+      impl User {
+          /// Creates a new user with the given name and ID.
+          pub fn new(name: String, id: u64) -> Self {
+              Self { name, id }
+          }
+          
+          /// Returns a reference to the user's name.
+          pub fn name(&self) -> &str {
+              &self.name
+          }
+          
+          /// Returns the user's ID.
+          pub fn id(&self) -> u64 {
+              self.id
+          }
+      }
+      
+      // Builder pattern for complex objects
+      pub struct UserBuilder {
+          name: Option<String>,
+          id: Option<u64>,
+          // more fields...
+      }
+      
+      impl UserBuilder {
+          pub fn new() -> Self {
+              Self {
+                  name: None,
+                  id: None,
+              }
+          }
+          
+          pub fn name(mut self, name: impl Into<String>) -> Self {
+              self.name = Some(name.into());
+              self
+          }
+          
+          pub fn id(mut self, id: u64) -> Self {
+              self.id = Some(id);
+              self
+          }
+          
+          pub fn build(self) -> Result<User, &'static str> {
+              let name = self.name.ok_or("name is required")?;
+              let id = self.id.ok_or("id is required")?;
+              
+              Ok(User { name, id })
+          }
+      }
+
+  - input: |
+      // Bad: No clear structure or organization
+      pub fn process_data(data: Vec<u8>) -> Result<Vec<u8>, String> {
+          // ...
+          Ok(data)
+      }
+      
+      pub enum Status { Ok, Error }
+      
+      // No clear error handling strategy
+      pub fn connect() -> Status {
+          // ...
+          Status::Ok
+      }
+      
+      // No documentation or method grouping
+      pub struct Client {
+          // ...
+      }
+      
+      impl Client {
+          pub fn new() -> Self { /* ... */ Self {} }
+          pub fn process(&self) -> bool { /* ... */ true }
+          pub fn set_timeout(&mut self, timeout: u64) { /* ... */ }
+          pub fn is_connected(&self) -> bool { /* ... */ true }
+      }
+    output: |
+      // Good: Clear module organization with documentation
+      
+      // error.rs
+      /// Errors that can occur during processing.
+      #[derive(Debug, thiserror::Error)]
+      pub enum Error {
+          /// An I/O error occurred.
+          #[error("I/O error: {0}")]
+          Io(#[from] std::io::Error),
+          
+          /// The data is invalid.
+          #[error("Invalid data: {0}")]
+          InvalidData(String),
+          
+          /// The connection failed.
+          #[error("Connection failed: {0}")]
+          ConnectionFailed(String),
+      }
+      
+      // Re-export common Result type
+      pub type Result<T> = std::result::Result<T, Error>;
+      
+      // processing.rs
+      /// Processes the provided data.
+      ///
+      /// # Examples
+      ///
+      /// ```
+      /// let result = process_data(&[1, 2, 3])?;
+      /// assert_eq!(result, vec![2, 4, 6]);
+      /// ```
+      pub fn process_data(data: &[u8]) -> Result<Vec<u8>> {
+          // ...
+          Ok(data.into())
+      }
+      
+      // client.rs
+      /// A client for connecting to the service.
+      pub struct Client {
+          // Private fields
+          timeout: u64,
+          connected: bool,
+      }
+      
+      impl Client {
+          /// Creates a new client with default settings.
+          pub fn new() -> Self {
+              Self {
+                  timeout: 30,
+                  connected: false,
+              }
+          }
+          
+          /// Returns a builder for creating a client with custom settings.
+          pub fn builder() -> ClientBuilder {
+              ClientBuilder::new()
+          }
+          
+          // Group methods by functionality
+          
+          // Connection methods
+          
+          /// Connects to the service.
+          pub fn connect(&mut self) -> Result<()> {
+              // ...
+              self.connected = true;
+              Ok(())
+          }
+          
+          /// Returns whether the client is connected.
+          pub fn is_connected(&self) -> bool {
+              self.connected
+          }
+          
+          // Configuration methods
+          
+          /// Sets the timeout for requests.
+          pub fn set_timeout(&mut self, timeout: u64) {
+              self.timeout = timeout;
+          }
+          
+          /// Returns the current timeout.
+          pub fn timeout(&self) -> u64 {
+              self.timeout
+          }
+          
+          // Processing methods
+          
+          /// Processes the request.
+          pub fn process(&self) -> Result<bool> {
+              if !self.connected {
+                  return Err(Error::ConnectionFailed("Not connected".into()));
+              }
+              // ...
+              Ok(true)
+          }
+      }
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>

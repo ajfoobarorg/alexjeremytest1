@@ -7,7 +7,14 @@
     ".cursor/rules/js-formatter.mdc",
     ".cursor/rules/js-linter.mdc",
     ".cursor/rules/svelte-structure.mdc",
-    ".cursor/rules/cursor-rules-location.mdc"
+    ".cursor/rules/cursor-rules-location.mdc",
+    ".cursor/rules/rust-api-design.mdc",
+    ".cursor/rules/rust-error-handling.mdc",
+    ".cursor/rules/rust-performance.mdc",
+    ".cursor/rules/rust-tooling.mdc",
+    ".cursor/rules/rust-concurrency.mdc",
+    ".cursor/rules/rust-ownership.mdc",
+    ".cursor/rules/rust-testing.mdc"
   ],
   "formatOnSave": true,
   "description": "Main Cursor configuration file that includes all rule sets"

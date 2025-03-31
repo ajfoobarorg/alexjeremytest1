@@ -1,0 +1,105 @@
+---
+description: Rust Error Handling Best Practices
+globs: **/*.rs
+alwaysApply: true
+---
+# Rust Error Handling
+
+Guidelines for robust and idiomatic error handling in Rust.
+
+<rule>
+name: rust_error_handling
+description: Best practices for error handling in Rust code
+
+filters:
+  - type: file_extension
+    pattern: "\\.rs$"
+  - type: event
+    pattern: "file_create|file_edit"
+
+actions:
+  - type: suggest
+    message: |
+      ## Rust Error Handling Best Practices
+      
+      1. **Use custom error types** for libraries:
+         - Implement `std::error::Error` trait for custom error types
+         - Consider using `thiserror` for deriving error implementations
+      
+      2. **Use Result<T, E> for functions that can fail**:
+         - Avoid panics in library code
+         - Return errors explicitly for callers to handle
+      
+      3. **Use the `?` operator** for error propagation:
+         - Chain operations concisely
+         - Limit use of `match` for error handling when `?` suffices
+      
+      4. **Provide context to errors**:
+         - Use `context()` from crates like `anyhow` or `eyre`
+         - Add error sources for structured error information
+      
+      5. **Choose appropriate error handling crates**:
+         - `thiserror` for library error definitions
+         - `anyhow` for applications without custom error types
+         - `eyre` for richer error reports
+      
+      6. **Avoid unwrap() and expect()**:
+         - Use only for prototyping, tests, or genuinely unreachable cases
+         - Prefer proper error handling in production code
+
+examples:
+  - input: |
+      // Bad: Using unwrap() or expect() in production code
+      fn read_config() -> Config {
+          let file = File::open("config.toml").unwrap();
+          let config: Config = toml::from_str(&content).expect("Invalid config");
+          config
+      }
+      
+      // Bad: Overuse of match for error handling
+      fn process_data(path: &str) -> Result<(), Box<dyn Error>> {
+          let file = match File::open(path) {
+              Ok(file) => file,
+              Err(err) => return Err(Box::new(err)),
+          };
+          let reader = BufReader::new(file);
+          let content = match std::fs::read_to_string(path) {
+              Ok(content) => content,
+              Err(err) => return Err(Box::new(err)),
+          };
+          // More error-prone code...
+          Ok(())
+      }
+    output: |
+      // Good: Custom error type with thiserror
+      use thiserror::Error;
+      
+      #[derive(Error, Debug)]
+      enum ConfigError {
+          #[error("failed to open config file: {0}")]
+          Io(#[from] std::io::Error),
+          
+          #[error("failed to parse config: {0}")]
+          Parse(#[from] toml::de::Error),
+      }
+      
+      fn read_config() -> Result<Config, ConfigError> {
+          let content = std::fs::read_to_string("config.toml")?;
+          let config: Config = toml::from_str(&content)?;
+          Ok(config)
+      }
+      
+      // Good: Using ? operator for concise error handling
+      fn process_data(path: &str) -> Result<(), anyhow::Error> {
+          let file = File::open(path).context("failed to open file")?;
+          let reader = BufReader::new(file);
+          let content = std::fs::read_to_string(path)
+              .context("failed to read file contents")?;
+          // More code...
+          Ok(())
+      }
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>

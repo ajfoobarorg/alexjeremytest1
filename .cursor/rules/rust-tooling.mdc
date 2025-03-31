@@ -1,0 +1,252 @@
+---
+description: Rust Tooling Integration
+globs: **/*.rs
+alwaysApply: true
+---
+# Rust Tooling Integration
+
+Guidelines for integrating and using Rust development tools for consistent code quality.
+
+<rule>
+name: rust_tooling
+description: Best practices for using Rust development tools like clippy, rustfmt, and related tooling
+
+filters:
+  - type: file_extension
+    pattern: "\\.rs$"
+  - type: event
+    pattern: "file_create|file_edit"
+
+actions:
+  - type: suggest
+    message: |
+      ## Rust Tooling Best Practices
+      
+      1. **Use rustfmt for consistent formatting**:
+         - Apply rustfmt to all Rust code
+         - Use a consistent configuration via `rustfmt.toml`
+         - Run rustfmt in CI to ensure formatting compliance
+         - Consider using `cargo fmt --all -- --check` in CI
+      
+      2. **Enable and follow clippy lints**:
+         - Run clippy regularly: `cargo clippy`
+         - Address all clippy warnings or explicitly allow exceptions
+         - Use appropriate lint levels in `clippy.toml`
+         - Consider enabling pedantic or restriction lints for stricter checks
+      
+      3. **Automate with cargo-make or similar tools**:
+         - Define standard workflows for build, test, lint
+         - Ensure consistency between local and CI environments
+         - Automate common development tasks
+      
+      4. **Use cargo-audit for security**:
+         - Regularly scan dependencies for vulnerabilities
+         - Run in CI/CD pipelines
+         - Set up automated security advisories
+      
+      5. **Leverage IDE integration**:
+         - Configure rust-analyzer for code intelligence
+         - Set up on-save formatting and linting
+         - Use inline diagnostics for immediate feedback
+      
+      6. **Document tool configuration**:
+         - Include `rustfmt.toml` and `clippy.toml` in repo
+         - Document non-standard lint configurations
+         - Provide setup instructions for new contributors
+      
+      7. **Integrate with CI/CD pipelines**:
+         - Run all tools in CI before merging code
+         - Fail CI on clippy warnings and rustfmt inconsistencies
+         - Measure and track code coverage with tools like tarpaulin
+      
+      8. **Use cargo-outdated for dependency management**:
+         - Track outdated dependencies
+         - Regularly update dependencies to benefit from improvements
+
+examples:
+  - input: |
+      // Project without tooling configuration files
+      
+      // Code with inconsistent formatting
+      fn example_function(  data: Vec<u32>)->Result<u32,String>{
+          if data.len()==0{return Err("empty data".to_string());}
+          let result=data.iter().sum();
+          Ok (result)
+      }
+      
+      // Code with clippy warnings
+      fn process_items(data: &Vec<u32>) -> u32 {
+          let mut sum = 0;
+          for i in 0..data.len() {
+              sum += data[i];
+          }
+          sum
+      }
+    output: |
+      // Project with proper tooling configuration
+      
+      // rustfmt.toml
+      ```
+      edition = "2021"
+      max_width = 100
+      tab_spaces = 4
+      reorder_imports = true
+      ```
+      
+      // clippy.toml
+      ```
+      cognitive-complexity-threshold = 25
+      ```
+      
+      // .cargo/config.toml
+      ```
+      [alias]
+      lint = "clippy -- -W clippy::pedantic"
+      check-all = "check --all-targets --all-features"
+      ```
+      
+      // Properly formatted code that passes clippy
+      fn example_function(data: Vec<u32>) -> Result<u32, String> {
+          if data.is_empty() {
+              return Err("empty data".to_string());
+          }
+          let result = data.iter().sum();
+          Ok(result)
+      }
+      
+      // Using slice instead of Vec reference
+      fn process_items(data: &[u32]) -> u32 {
+          // Using iterator instead of indexing
+          data.iter().sum()
+      }
+
+  - input: |
+      // Minimal or missing CI configuration
+      
+      // No documented developer setup
+      
+      // Manual check process is error-prone
+      # Bash script for manual checks
+      cargo build
+      cargo test
+      # Developer might forget to run these:
+      # cargo fmt
+      # cargo clippy
+    output: |
+      // GitHub Actions workflow with proper tooling integration
+      ```yaml
+      # .github/workflows/rust.yml
+      name: Rust
+      
+      on:
+        push:
+          branches: [ main ]
+        pull_request:
+          branches: [ main ]
+      
+      jobs:
+        check:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                components: clippy, rustfmt
+            
+            - name: Check formatting
+              run: cargo fmt --all -- --check
+              
+            - name: Clippy
+              run: cargo clippy -- -D warnings
+              
+            - name: Security audit
+              run: |
+                cargo install cargo-audit
+                cargo audit
+                
+            - name: Build
+              run: cargo build --verbose
+              
+            - name: Run tests
+              run: cargo test --verbose
+              
+            - name: Code coverage
+              run: |
+                cargo install cargo-tarpaulin
+                cargo tarpaulin --out Xml
+      ```
+      
+      // Developer setup doc
+      ```markdown
+      # Developer Setup
+      
+      ## Required Tools
+      
+      - Rust (stable) with the following components:
+        - rustfmt
+        - clippy
+      - Additional tools:
+        - cargo-make
+        - cargo-audit
+        - cargo-outdated
+      
+      ## Setup Commands
+      
+      ```bash
+      # Install Rust
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+      
+      # Add components
+      rustup component add clippy rustfmt
+      
+      # Install additional tools
+      cargo install cargo-make cargo-audit cargo-outdated
+      ```
+      
+      ## Development Workflow
+      
+      - Run `cargo make dev` for common development tasks
+      - Before committing, run `cargo make pre-commit`
+      ```
+      
+      // Cargo.make.toml (with cargo-make)
+      ```toml
+      [tasks.format]
+      command = "cargo"
+      args = ["fmt", "--all"]
+      
+      [tasks.clippy]
+      command = "cargo"
+      args = ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"]
+      
+      [tasks.test]
+      command = "cargo"
+      args = ["test"]
+      
+      [tasks.audit]
+      command = "cargo"
+      args = ["audit"]
+      
+      [tasks.outdated]
+      command = "cargo"
+      args = ["outdated"]
+      
+      [tasks.pre-commit]
+      dependencies = [
+          "format",
+          "clippy",
+          "test",
+      ]
+      
+      [tasks.dev]
+      dependencies = [
+          "format",
+          "clippy",
+          "test",
+      ]
+      ```
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>

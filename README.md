@@ -13,7 +13,9 @@
 
 
 # Arch notes
-Backend is FastAPI (a python backend)
+Backend has two implementations:
+- Python backend using FastAPI
+- Rust backend using Axum (experimental)
 
 FE is Svelte, served for development via vite.
 
@@ -21,12 +23,20 @@ No CSS framework yet (consider Tailwind)
 
 
 # How to run locally
+
+Frontend:
 ```
 cd frontend && bun run dev
 ```
-and in another terminal:
+
+Python Backend:
 ```
 cd backend && uvicorn main:app --reload
+```
+
+Rust Backend:
+```
+cd rustbackend && cargo run
 ```
 
 # Local setup

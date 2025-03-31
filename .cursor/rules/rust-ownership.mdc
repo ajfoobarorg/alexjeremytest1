@@ -1,0 +1,152 @@
+---
+description: Rust Ownership and Memory Safety
+globs: **/*.rs
+alwaysApply: true
+---
+# Rust Ownership and Memory Safety
+
+Guidelines for proper use of Rust's ownership system and memory safety features.
+
+<rule>
+name: rust_ownership
+description: Best practices for ownership, borrowing, and memory safety in Rust
+
+filters:
+  - type: file_extension
+    pattern: "\\.rs$"
+  - type: event
+    pattern: "file_create|file_edit"
+
+actions:
+  - type: suggest
+    message: |
+      ## Rust Ownership Best Practices
+      
+      1. **Follow the ownership rules**:
+         - Each value has a single owner
+         - When owner goes out of scope, value is dropped
+         - Only one mutable reference OR multiple immutable references
+      
+      2. **Prefer borrowing over ownership transfer**:
+         - Use references (`&T`, `&mut T`) when possible
+         - Accept references in function parameters when you don't need ownership
+      
+      3. **Use `Clone` judiciously**:
+         - Avoid unnecessary cloning for performance reasons
+         - Consider using Cow<T> for conditional cloning
+      
+      4. **Use lifetimes appropriately**:
+         - Explicit lifetimes when compiler needs help
+         - Use lifetime elision when the compiler can infer them
+      
+      5. **Avoid unsafe code when possible**:
+         - Encapsulate unsafe code in safe abstractions
+         - Document invariants that unsafe code relies on
+      
+      6. **Leverage the type system**:
+         - Use enums for states with different data requirements
+         - Use Option<T> for optional values instead of null
+         - Use Result<T, E> for fallible operations
+      
+      7. **Minimize use of reference-counted types**:
+         - Use Rc/Arc only when shared ownership is necessary
+         - Prefer Box<T> for single ownership of heap data
+
+examples:
+  - input: |
+      // Bad: Unnecessary cloning
+      fn process_string(s: String) -> usize {
+          s.len()
+      }
+      
+      fn main() {
+          let name = String::from("Rust");
+          let len = process_string(name.clone()); // Unnecessary clone
+          println!("Length: {}, Name: {}", len, name);
+      }
+      
+      // Bad: Using unsafe without proper documentation
+      fn get_first_element(slice: &[u32]) -> u32 {
+          unsafe {
+              *slice.get_unchecked(0)
+          }
+      }
+    output: |
+      // Good: Using references instead of cloning
+      fn process_string(s: &str) -> usize {
+          s.len()
+      }
+      
+      fn main() {
+          let name = String::from("Rust");
+          let len = process_string(&name); // No clone needed, just borrow
+          println!("Length: {}, Name: {}", len, name);
+      }
+      
+      // Good: Safe abstraction with proper documentation
+      /// Returns the first element of the slice, or 0 if the slice is empty.
+      /// 
+      /// This function avoids panic by checking if the slice is empty.
+      fn get_first_element(slice: &[u32]) -> u32 {
+          slice.first().copied().unwrap_or(0)
+      }
+      
+      // If unsafe is necessary, document carefully:
+      /// Returns the first element of the slice.
+      /// 
+      /// # Safety
+      /// 
+      /// The caller must ensure the slice is non-empty.
+      /// Calling this function on an empty slice results in undefined behavior.
+      unsafe fn get_first_element_unchecked(slice: &[u32]) -> u32 {
+          *slice.get_unchecked(0)
+      }
+
+  - input: |
+      // Bad: Excessive use of reference counting
+      struct Node {
+          value: i32,
+          children: Vec<Rc<RefCell<Node>>>,
+      }
+      
+      // Bad: Ignoring lifetime relationships
+      struct Cache {
+          data: HashMap<String, Vec<u8>>,
+      }
+      
+      impl Cache {
+          fn get_data<'a>(&'a self, key: &str) -> Option<&'a Vec<u8>> {
+              self.data.get(key)
+          }
+      }
+    output: |
+      // Good: Using appropriate data structures for ownership
+      enum Node {
+          Leaf(i32),
+          Branch(i32, Vec<Box<Node>>),
+      }
+      
+      // Only use Rc when truly needed for shared ownership
+      struct SharedNode {
+          value: i32,
+          parent: Option<Weak<RefCell<SharedNode>>>,  // Weak to avoid cycles
+          children: Vec<Rc<RefCell<SharedNode>>>,
+      }
+      
+      // Good: Proper lifetime usage
+      struct Cache<'a> {
+          data: HashMap<String, Vec<u8>>,
+          source: &'a DataSource,  // Explicit about the borrowed data
+      }
+      
+      impl<'a> Cache<'a> {
+          // Elided lifetime when it's clear
+          fn get_data(&self, key: &str) -> Option<&Vec<u8>> {
+              self.data.get(key)
+          }
+      }
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>

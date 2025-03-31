@@ -1,0 +1,256 @@
+---
+description: Rust Testing Best Practices
+globs: **/*.rs
+alwaysApply: true
+---
+# Rust Testing
+
+Guidelines for writing effective and maintainable tests in Rust.
+
+<rule>
+name: rust_testing
+description: Best practices for testing Rust code
+
+filters:
+  - type: file_extension
+    pattern: "\\.rs$"
+  - type: event
+    pattern: "file_create|file_edit"
+
+actions:
+  - type: suggest
+    message: |
+      ## Rust Testing Best Practices
+      
+      1. **Use appropriate test types**:
+         - Unit tests in the same file as the code
+         - Integration tests in the `tests/` directory
+         - Doctests for documentation and examples
+      
+      2. **Follow test organization patterns**:
+         - Use a `tests` module with `#[cfg(test)]`
+         - Group related tests in submodules
+         - Name tests clearly: `test_<function>_<scenario>`
+      
+      3. **Write focused unit tests**:
+         - Test one piece of functionality per test
+         - Use setup/teardown for common operations
+         - Test both success and failure paths
+      
+      4. **Use test utilities**:
+         - Create test fixtures for common data
+         - Use parameterized tests with macros or data-driven approaches
+         - Extract common assert logic to helper functions
+      
+      5. **Mock dependencies effectively**:
+         - Use trait abstractions for mocking
+         - Consider crates like `mockall` for complex mocking
+         - Inject test doubles through dependency injection
+      
+      6. **Test edge cases and error paths**:
+         - Empty collections, boundary values
+         - Error propagation and handling
+         - Ensure panics happen when expected with `#[should_panic]`
+      
+      7. **Use property-based testing**:
+         - Consider proptest or quickcheck for generative testing
+         - Test invariants and properties rather than specific examples
+         - Generate diverse inputs to find edge cases
+      
+      8. **Test for concurrency issues**:
+         - Use loom for testing concurrent code
+         - Test with various thread counts and scheduling
+         - Verify thread safety guarantees
+
+examples:
+  - input: |
+      // Bad: No tests or poorly organized tests
+      fn add(a: i32, b: i32) -> i32 {
+          a + b
+      }
+      
+      // Tests mixed with implementation without cfg(test)
+      fn test_add() {
+          assert_eq!(add(2, 3), 5);
+      }
+      
+      // Bad: Overly broad test covering multiple functions
+      #[test]
+      fn test_all_math_functions() {
+          assert_eq!(add(2, 3), 5);
+          assert_eq!(subtract(5, 3), 2);
+          assert_eq!(multiply(2, 3), 6);
+          // ...more assertions
+      }
+    output: |
+      fn add(a: i32, b: i32) -> i32 {
+          a + b
+      }
+      
+      // Good: Well-organized tests with cfg(test)
+      #[cfg(test)]
+      mod tests {
+          use super::*;
+          
+          // Specific function tests
+          #[test]
+          fn test_add_positive_numbers() {
+              assert_eq!(add(2, 3), 5);
+          }
+          
+          #[test]
+          fn test_add_negative_numbers() {
+              assert_eq!(add(-2, -3), -5);
+          }
+          
+          #[test]
+          fn test_add_mixed_signs() {
+              assert_eq!(add(-2, 5), 3);
+              assert_eq!(add(2, -5), -3);
+          }
+          
+          // Testing edge cases
+          #[test]
+          fn test_add_zero() {
+              assert_eq!(add(0, 5), 5);
+              assert_eq!(add(5, 0), 5);
+          }
+          
+          #[test]
+          fn test_add_overflow() {
+              // Test what happens at boundaries
+              let result = add(i32::MAX, 1);
+              // Depending on expected behavior:
+              // assert_eq!(result, i32::MIN); // If wrapping is expected
+              // or handle overflow checking if that's the expected behavior
+          }
+      }
+
+  - input: |
+      // Bad: Hard to test due to direct dependencies and no abstraction
+      pub struct UserService {
+          db_connection: DbConnection,
+      }
+      
+      impl UserService {
+          pub fn new() -> Self {
+              Self {
+                  db_connection: DbConnection::new("database_url"),
+              }
+          }
+          
+          pub fn create_user(&self, username: &str) -> Result<User, Error> {
+              // Direct DB calls, hard to test
+              let user = User::new(username);
+              self.db_connection.insert("users", &user)?;
+              Ok(user)
+          }
+      }
+      
+      // Bad: Test requires a real database
+      #[test]
+      fn test_create_user() {
+          let service = UserService::new(); // Uses real DB
+          let result = service.create_user("testuser");
+          assert!(result.is_ok());
+      }
+    output: |
+      // Good: Abstracted dependencies with traits for testability
+      pub trait Database {
+          fn insert(&self, table: &str, data: &impl Serialize) -> Result<(), Error>;
+          fn find(&self, table: &str, id: &str) -> Result<Option<User>, Error>;
+      }
+      
+      pub struct DbConnection {
+          url: String,
+      }
+      
+      impl DbConnection {
+          pub fn new(url: &str) -> Self {
+              Self { url: url.to_string() }
+          }
+      }
+      
+      impl Database for DbConnection {
+          fn insert(&self, table: &str, data: &impl Serialize) -> Result<(), Error> {
+              // Real implementation...
+              Ok(())
+          }
+          
+          fn find(&self, table: &str, id: &str) -> Result<Option<User>, Error> {
+              // Real implementation...
+              Ok(None)
+          }
+      }
+      
+      pub struct UserService<DB: Database> {
+          db: DB,
+      }
+      
+      impl<DB: Database> UserService<DB> {
+          pub fn new(db: DB) -> Self {
+              Self { db }
+          }
+          
+          pub fn create_user(&self, username: &str) -> Result<User, Error> {
+              let user = User::new(username);
+              self.db.insert("users", &user)?;
+              Ok(user)
+          }
+      }
+      
+      // Good: Test with mock database
+      #[cfg(test)]
+      mod tests {
+          use super::*;
+          use mockall::{mock, predicate::*};
+          
+          mock! {
+              Database {}
+              
+              impl Database for Database {
+                  fn insert(&self, table: &str, data: &impl Serialize) -> Result<(), Error>;
+                  fn find(&self, table: &str, id: &str) -> Result<Option<User>, Error>;
+              }
+          }
+          
+          #[test]
+          fn test_create_user_success() {
+              let mut mock_db = MockDatabase::new();
+              
+              // Setup expectations
+              mock_db.expect_insert()
+                  .with(eq("users"), always())
+                  .times(1)
+                  .returning(|_, _| Ok(()));
+              
+              let service = UserService::new(mock_db);
+              let result = service.create_user("testuser");
+              
+              assert!(result.is_ok());
+              let user = result.unwrap();
+              assert_eq!(user.username, "testuser");
+          }
+          
+          #[test]
+          fn test_create_user_db_error() {
+              let mut mock_db = MockDatabase::new();
+              
+              // Setup expectations for failure
+              mock_db.expect_insert()
+                  .with(eq("users"), always())
+                  .times(1)
+                  .returning(|_, _| Err(Error::DatabaseError("connection failed".into())));
+              
+              let service = UserService::new(mock_db);
+              let result = service.create_user("testuser");
+              
+              assert!(result.is_err());
+              // Verify error type if needed
+          }
+      }
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>

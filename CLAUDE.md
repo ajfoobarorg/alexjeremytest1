@@ -7,16 +7,23 @@
 - Lint code: `cd backend && ruff check .`
 - Format code: `cd backend && black .`
 
+## Backend (Rust)
+- Run server: `cd rustbackend && cargo run`
+- Run tests: `cd rustbackend && cargo test`
+- Lint code: `cd rustbackend && cargo clippy`
+- Format code: `cd rustbackend && cargo fmt`
+
 ## Frontend (Svelte)
 - Run dev server: `cd frontend && bun run dev`
 - Build for production: `cd frontend && bun run build`
 
 ## Style Guidelines
 - Python: Google-style docstrings, Black formatting (88 chars), imports ordered (standard → third-party → FastAPI → local)
+- Rust: Standard Rust formatting (rustfmt), follow Rust API guidelines, proper error handling with Result/Option
 - JS/Svelte: Prettier formatting, 2-space indent, 100 char line limit, single quotes
 - Svelte components: script → style → template structure
 - Error handling: Clear error messages, proper validation
-- Types: Strong typing everywhere (Pydantic for Python, TypeScript for frontend)
+- Types: Strong typing everywhere (Pydantic for Python, proper types for Rust, TypeScript for frontend)
 
 ## Git Workflow
 - Feature branches from main

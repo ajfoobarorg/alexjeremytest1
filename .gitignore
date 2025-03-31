@@ -177,3 +177,8 @@ cython_debug/
 # SQLLite stuff
 *.db-shm
 *.db-wal
+
+# Rust
+/rustbackend/target
+**/*.rs.bk
+/rustbackend/Cargo.lock

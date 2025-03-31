@@ -1,0 +1,144 @@
+---
+description: Rust Performance Optimization
+globs: **/*.rs
+alwaysApply: true
+---
+# Rust Performance Optimization
+
+Guidelines for writing high-performance Rust code.
+
+<rule>
+name: rust_performance
+description: Best practices for optimizing Rust code performance
+
+filters:
+  - type: file_extension
+    pattern: "\\.rs$"
+  - type: event
+    pattern: "file_create|file_edit"
+
+actions:
+  - type: suggest
+    message: |
+      ## Rust Performance Best Practices
+      
+      1. **Minimize allocations**:
+         - Reuse allocations where possible
+         - Use stack allocation for small, fixed-size data
+         - Consider custom allocators for specific use cases
+      
+      2. **Use appropriate data structures**:
+         - Choose containers based on access patterns
+         - Consider specialized structures (e.g., `SmallVec` for small arrays)
+         - Use capacity hints when size is known in advance
+      
+      3. **Leverage zero-cost abstractions**:
+         - Iterators instead of explicit loops
+         - Higher-order functions like `map`, `filter`
+         - Implement traits for custom types
+      
+      4. **Consider inlining and compiler optimizations**:
+         - Use `#[inline]` judiciously for small, frequently-called functions
+         - Enable appropriate optimization levels in release builds
+         - Profile before premature optimization
+      
+      5. **Avoid unnecessary bounds checks**:
+         - Use iterator methods over indexing
+         - Use `get_unchecked` with care in critical sections (with safety guarantees)
+      
+      6. **Minimize dynamic dispatch**:
+         - Prefer static dispatch (generics, traits) over dynamic dispatch
+         - Use trait objects only when necessary
+      
+      7. **Use efficient concurrency patterns**:
+         - Choose appropriate synchronization primitives
+         - Consider lock-free algorithms where applicable
+         - Use Rayon for parallel iterators
+      
+      8. **Optimize for cache locality**:
+         - Group related data in memory
+         - Consider structure of arrays (SoA) vs. array of structures (AoS)
+
+examples:
+  - input: |
+      // Bad: Unnecessary allocations
+      fn process_data(data: &[u32]) -> Vec<u32> {
+          let mut result = Vec::new();
+          for item in data {
+              let doubled = item * 2;
+              result.push(doubled);
+          }
+          result
+      }
+      
+      // Bad: Unnecessary bounds checking
+      fn sum_array(data: &[i32]) -> i32 {
+          let mut sum = 0;
+          for i in 0..data.len() {
+              sum += data[i];
+          }
+          sum
+      }
+    output: |
+      // Good: Efficient use of iterators and pre-allocation
+      fn process_data(data: &[u32]) -> Vec<u32> {
+          let mut result = Vec::with_capacity(data.len()); // Pre-allocate
+          
+          // Zero-cost abstractions via iterators
+          result.extend(data.iter().map(|item| item * 2));
+          
+          // Alternative with collect
+          // let result: Vec<u32> = data.iter().map(|item| item * 2).collect();
+          
+          result
+      }
+      
+      // Good: Avoiding bounds checks with iterators
+      fn sum_array(data: &[i32]) -> i32 {
+          data.iter().sum() // Efficient, no bounds checks
+      }
+
+  - input: |
+      // Bad: Excessive dynamic dispatch
+      fn process_shapes(shapes: &[Box<dyn Shape>]) -> f64 {
+          shapes.iter().map(|s| s.area()).sum()
+      }
+      
+      // Bad: Creating small vectors repeatedly in a loop
+      fn process_chunks(data: &[u8], chunk_size: usize) -> Vec<u32> {
+          let mut results = Vec::new();
+          for chunk in data.chunks(chunk_size) {
+              let mut small_vec = Vec::new();
+              for &byte in chunk {
+                  small_vec.push(byte as u32);
+              }
+              results.push(small_vec.iter().sum());
+          }
+          results
+      }
+    output: |
+      // Good: Static dispatch via generics
+      fn process_shapes<T: Shape>(shapes: &[T]) -> f64 {
+          shapes.iter().map(|s| s.area()).sum()
+      }
+      
+      // Alternative: Using generic dispatch but allowing mixed shapes
+      fn process_mixed_shapes<I, S>(shapes: I) -> f64
+      where
+          I: IntoIterator<Item = S>,
+          S: AsRef<dyn Shape>,
+      {
+          shapes.into_iter().map(|s| s.as_ref().area()).sum()
+      }
+      
+      // Good: Avoiding temporary allocations
+      fn process_chunks(data: &[u8], chunk_size: usize) -> Vec<u32> {
+          data.chunks(chunk_size)
+              .map(|chunk| chunk.iter().fold(0u32, |acc, &byte| acc + byte as u32))
+              .collect()
+      }
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>
