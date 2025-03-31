@@ -1,1 +1,226 @@
- 
+---
+description: Rust Concurrency and Async Programming
+globs: **/*.rs
+alwaysApply: true
+---
+# Rust Concurrency and Async Programming
+
+Guidelines for writing reliable concurrent and asynchronous code in Rust.
+
+<rule>
+name: rust_concurrency
+description: Best practices for concurrency, parallelism, and async programming in Rust
+
+filters:
+  - type: file_extension
+    pattern: "\\.rs$"
+  - type: event
+    pattern: "file_create|file_edit"
+
+actions:
+  - type: suggest
+    message: |
+      ## Rust Concurrency and Async Best Practices
+      
+      1. **Choose the right concurrency model**:
+         - `std::thread` for CPU-bound tasks
+         - Async/await for I/O-bound operations
+         - Rayon for data parallelism
+      
+      2. **Use safe abstractions**:
+         - Channel-based communication (mpsc, crossbeam)
+         - Thread pools via Rayon or custom implementations
+         - Actor-based concurrency with crates like Actix
+      
+      3. **Follow async/await patterns**:
+         - Use appropriate runtime (tokio, async-std)
+         - Properly propagate cancellation
+         - Use Stream for handling multiple values over time
+      
+      4. **Handle shared state properly**:
+         - Use appropriate synchronization primitives (Mutex, RwLock)
+         - Consider lock-free data structures when appropriate
+         - Prefer message passing when possible
+      
+      5. **Manage thread safety**:
+         - Use Send and Sync traits correctly
+         - Avoid sharing mutable data when possible
+         - Prefer Arc over Rc for thread-safe reference counting
+      
+      6. **Avoid common pitfalls**:
+         - Deadlocks: acquire locks in consistent order
+         - Starvation: avoid holding locks during long operations
+         - False sharing: be mindful of cache line contention
+      
+      7. **Optimize for performance**:
+         - Balance task granularity for parallelism
+         - Use async only where beneficial
+         - Consider work-stealing schedulers for balanced workloads
+      
+      8. **Test concurrent code thoroughly**:
+         - Use tools like loom for concurrent testing
+         - Write stress tests for race conditions
+         - Consider fuzzing to find concurrency bugs
+
+examples:
+  - input: |
+      // Bad: Naive use of threads with shared data
+      fn process_data(data: Vec<u32>) -> u32 {
+          let mut result = 0;
+          let mut handles = vec![];
+          
+          for chunk in data.chunks(100) {
+              let chunk = chunk.to_vec();
+              handles.push(std::thread::spawn(move || {
+                  for item in chunk {
+                      result += item; // WRONG: accessing shared variable across threads
+                  }
+              }));
+          }
+          
+          for h in handles {
+              h.join().unwrap();
+          }
+          
+          result
+      }
+      
+      // Bad: Naive async implementation
+      async fn process_requests(urls: Vec<String>) -> Vec<String> {
+          let mut results = vec![];
+          
+          for url in urls {
+              // Sequential processing, no benefit from async
+              let response = reqwest::get(&url).await.unwrap().text().await.unwrap();
+              results.push(response);
+          }
+          
+          results
+      }
+    output: |
+      // Good: Thread-safe parallel processing with channels
+      fn process_data(data: Vec<u32>) -> u32 {
+          let (tx, rx) = std::sync::mpsc::channel();
+          let mut handles = vec![];
+          
+          for chunk in data.chunks(100) {
+              let chunk = chunk.to_vec();
+              let tx = tx.clone();
+              handles.push(std::thread::spawn(move || {
+                  let sum: u32 = chunk.iter().sum();
+                  tx.send(sum).unwrap();
+              }));
+          }
+          
+          // Close original sender
+          drop(tx);
+          
+          // Collect results
+          let total: u32 = rx.iter().sum();
+          
+          // Wait for all threads
+          for h in handles {
+              h.join().unwrap();
+          }
+          
+          total
+      }
+      
+      // Even better: Using Rayon for parallel processing
+      use rayon::prelude::*;
+      
+      fn process_data_rayon(data: Vec<u32>) -> u32 {
+          data.par_iter().sum()
+      }
+      
+      // Good: Concurrent async processing
+      async fn process_requests(urls: Vec<String>) -> Result<Vec<String>, reqwest::Error> {
+          use futures::future;
+          
+          // Create a future for each request - all requests start concurrently
+          let request_futures = urls.iter().map(|url| {
+              reqwest::get(url).and_then(|resp| resp.text())
+          });
+          
+          // Wait for all futures to complete
+          let results = future::join_all(request_futures).await;
+          
+          // Collect results, propagating errors
+          results.into_iter().collect()
+      }
+
+  - input: |
+      // Bad: Unsafe lock handling with potential deadlocks
+      fn transfer_funds(account1: &Mutex<Account>, account2: &Mutex<Account>, amount: u64) {
+          let mut acc1 = account1.lock().unwrap();
+          // This could deadlock if another thread locks in opposite order
+          let mut acc2 = account2.lock().unwrap();
+          
+          acc1.balance -= amount;
+          acc2.balance += amount;
+      }
+      
+      // Bad: Blocking in async context
+      async fn process_file(path: &str) -> Result<String, std::io::Error> {
+          // Blocking operation in async context
+          let content = std::fs::read_to_string(path)?;
+          let result = do_some_cpu_heavy_processing(&content);
+          Ok(result)
+      }
+    output: |
+      // Good: Safe lock handling with deadlock prevention
+      fn transfer_funds(account1: &Mutex<Account>, account2: &Mutex<Account>, amount: u64) {
+          // Sort accounts by ID to ensure consistent lock order
+          let (first, second) = if account1.id < account2.id {
+              (account1, account2)
+          } else {
+              (account2, account1)
+          };
+          
+          // Now lock in a consistent order
+          let mut first_acc = first.lock().unwrap();
+          let mut second_acc = second.lock().unwrap();
+          
+          // Transfer from account1 to account2, regardless of which is first/second
+          if std::ptr::eq(first, account1) {
+              first_acc.balance -= amount;
+              second_acc.balance += amount;
+          } else {
+              first_acc.balance += amount;
+              second_acc.balance -= amount;
+          }
+      }
+      
+      // Good: Properly handling blocking operations in async context
+      async fn process_file(path: &str) -> Result<String, std::io::Error> {
+          // Use tokio's fs utilities for async file operations
+          let content = tokio::fs::read_to_string(path).await?;
+          
+          // Spawn CPU-intensive work to a dedicated thread pool
+          let result = tokio::task::spawn_blocking(move || {
+              do_some_cpu_heavy_processing(&content)
+          }).await.unwrap();
+          
+          Ok(result)
+      }
+      
+      // Alternative: Using async-std
+      async fn process_file_async_std(path: &str) -> Result<String, std::io::Error> {
+          use async_std::fs;
+          use async_std::task;
+          
+          // Async file reading
+          let content = fs::read_to_string(path).await?;
+          
+          // Spawn CPU-intensive work to a dedicated thread
+          let result = task::spawn_blocking(move || {
+              do_some_cpu_heavy_processing(&content)
+          }).await;
+          
+          Ok(result)
+      }
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>
