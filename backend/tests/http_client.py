@@ -141,7 +141,7 @@ class ApiClient:
 class BackendServer:
     """Server manager for starting and stopping the backend server."""
     
-    def __init__(self, server_command="cd /Users/aroetter/src/alexjeremytest1/backend && python -m uvicorn main:app --reload", 
+    def __init__(self, server_command="cd backend && python -m uvicorn main:app --reload", 
                  server_url="http://localhost:8000"):
         self.server_command = server_command
         self.server_url = server_url
@@ -151,15 +151,21 @@ class BackendServer:
         """Start the backend server."""
         # Start the server as a subprocess
         logger.info(f"Starting backend server with command: {self.server_command}")
+        
+        # Use different process group handling based on platform
+        kwargs = {}
+        if os.name != 'nt':  # Unix/Linux/macOS
+            kwargs['preexec_fn'] = os.setsid  # Use process group for clean termination
+        
         self.process = subprocess.Popen(
             self.server_command, 
             shell=True,
-            preexec_fn=os.setsid  # Use process group for clean termination
+            **kwargs
         )
         
         # Wait for server to become available
-        max_retries = 30
-        retry_interval = 1
+        max_retries = 60  # Increase max retries for GitHub Actions
+        retry_interval = 2  # Longer interval between retries
         for i in range(max_retries):
             try:
                 response = requests.get(f"{self.server_url}/health")
@@ -178,16 +184,30 @@ class BackendServer:
         """Stop the backend server."""
         if self.process:
             print("🛑 Stopping backend server...")
-            # Kill the entire process group
+            
             try:
-                os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-                self.process.wait(timeout=5)
+                if os.name != 'nt':  # Unix/Linux/macOS
+                    # Kill the entire process group
+                    try:
+                        os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                        self.process.wait(timeout=5)
+                    except:
+                        # If anything goes wrong, try SIGKILL
+                        try:
+                            os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
+                        except:
+                            pass
+                else:
+                    # Windows - terminate directly
+                    self.process.terminate()
+                    self.process.wait(timeout=5)
             except:
-                # If anything goes wrong, try SIGKILL
+                # Last resort: terminate process
                 try:
-                    os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
+                    self.process.kill()
                 except:
                     pass
+                    
             self.process = None
 
 
@@ -200,7 +220,7 @@ def get_server():
     if _server_instance is None:
         server_command = os.environ.get(
             "BACKEND_SERVER_COMMAND", 
-            "cd /Users/aroetter/src/alexjeremytest1/backend && python -m uvicorn main:app --reload"
+            "cd backend && python -m uvicorn main:app --reload"
         )
         server_url = os.environ.get("BACKEND_URL", "http://localhost:8000")
         _server_instance = BackendServer(server_command, server_url)
@@ -217,6 +237,7 @@ def start_server_thread():
     atexit.register(server.stop)
     
     # Wait for server to start
-    time.sleep(5)
+    logger.info("Waiting for server to start in thread...")
+    time.sleep(10)  # Increase wait time for GitHub Actions
     
     return server
