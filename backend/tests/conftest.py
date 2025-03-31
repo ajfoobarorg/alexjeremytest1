@@ -93,42 +93,41 @@ def completed_game(sample_players):
     return game
 
 @pytest.fixture(scope="session")
-def backend_server():
-    """Start a backend server for true HTTP testing.
+def real_backend_server():
+    """Start a real backend server for HTTP-based testing.
     
-    Note: Only use this fixture if you want to test against a real server.
-    For normal tests, the TestClient is faster and more convenient.
-    """
-    # Comment out the server start code to use the TestClient by default
-    # Uncomment this section to start a real server
+    This fixture starts an actual server process for true end-to-end testing.
     """
     from tests.http_client import start_server_thread
+    print("\n⚡ Starting real HTTP server for end-to-end testing...")
     server = start_server_thread()
     yield server
+    print("\n🛑 Stopping real HTTP server...")
     # Server will be stopped by atexit handler
-    """
+
+
+@pytest.fixture(scope="session")
+def no_backend_server():
+    """Dummy fixture that doesn't start a backend server.
     
-    # For now, we're just yielding None to indicate no real server
+    This is used when we want to test with the TestClient instead.
+    """
     yield None
 
 @pytest.fixture
-def api_client(backend_server):
-    """Create an API client for HTTP-based tests.
-    
-    When backend_server is None (default), this creates a client that uses
-    the FastAPI TestClient. When a real server is started, this creates
-    a client that makes real HTTP requests.
-    """
-    # If we're using a real server, create a real HTTP client
-    if backend_server:
-        from tests.http_client import ApiClient
-        return ApiClient(backend_server.server_url)
-    
-    # Otherwise, create a wrapper around the TestClient
-    # that has the same interface as ApiClient
+def http_client(real_backend_server):
+    """Create a real HTTP client for tests against a running server."""
+    from tests.http_client import ApiClient
+    print("\n🌐 Creating HTTP client for real server testing...")
+    return ApiClient(real_backend_server.server_url)
+
+@pytest.fixture
+def test_client(no_backend_server):
+    """Create a TestClient wrapper for in-process testing."""
     from fastapi.testclient import TestClient
     from main import app
     
+    print("\n🔍 Creating TestClient for in-process testing...")
     test_client = TestClient(app)
     
     class TestClientWrapper:
@@ -183,4 +182,13 @@ def api_client(backend_server):
         def resign_game(self, game_id, player_id):
             return self.client.post(f"/games/{game_id}/resign?player_id={player_id}")
     
-    return TestClientWrapper() 
+    return TestClientWrapper()
+
+# Keep the original api_client fixture for backward compatibility
+@pytest.fixture
+def api_client(test_client):
+    """Create an API client for backward compatibility.
+    
+    This uses the TestClient by default to maintain compatibility with existing tests.
+    """
+    return test_client

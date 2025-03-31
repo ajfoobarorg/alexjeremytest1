@@ -55,6 +55,23 @@ class ApiClient:
             json={"player_x_id": player_x_id, "player_o_id": player_o_id}
         )
     
+    def direct_game_creation(self, player_x_id, player_o_id):
+        """Create a game directly (API-only fallback).
+        
+        For the HTTP client, we don't have access to the database directly,
+        so we fall back to the create_game API method, and if that fails,
+        we raise an error with a helpful message.
+        """
+        response = self.create_game(player_x_id, player_o_id)
+        if response.status_code != 200:
+            raise Exception(
+                f"Failed to create game via API: {response.status_code}\n"
+                f"For HTTP client, you need a '/games/create' API endpoint.\n"
+                f"Please implement this endpoint or use the test_client fixture instead."
+            )
+            
+        return response.json()
+    
     def resign_game(self, game_id, player_id):
         """Resign from a game."""
         return self.session.post(f"{self.base_url}/games/{game_id}/resign?player_id={player_id}")

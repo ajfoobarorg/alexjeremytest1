@@ -7,13 +7,13 @@ from schemas import PlayerLevel
 logger = logging.getLogger(__name__)
 
 @pytest.mark.e2e
-class TestEndToEndRegression:
-    """End-to-end regression test for the full backend API flow.
+class TestEndToEndRegressionBase:
+    """Base class for end-to-end regression tests.
     
-    This test will verify the entire game flow from user registration to game completion.
+    This class contains the shared logic for testing the full API flow.
     """
     
-    def test_full_game_flow(self, test_db, api_client):
+    def run_full_game_flow(self, test_db, client):
         """
         Complete end-to-end test of the application.
         
@@ -27,23 +27,131 @@ class TestEndToEndRegression:
         TODO #6: Verify ELO updates
         """
         # TODO #1: User creation and authentication
-        player1_id, player2_id = self._create_users_and_verify(api_client)
+        player1_id, player2_id = self._create_users_and_verify(client)
         
         # TODO #2: Game creation
-        game_id = self._create_game_and_verify(api_client, player1_id, player2_id)
+        game_id = self._create_game_and_verify(client, player1_id, player2_id)
         
         # TODO #3: Play initial moves
-        self._play_initial_moves(api_client, game_id, player1_id, player2_id)
+        self._play_initial_moves(client, game_id, player1_id, player2_id)
         
         # TODO #4: Win a sub-board
-        game_state = self._win_subboard(api_client, game_id, player1_id, player2_id)
+        game_state = self._win_subboard(client, game_id, player1_id, player2_id)
         
         # TODO #5: Complete the game
-        final_game_state = self._complete_game(api_client, game_id, player1_id, player2_id, game_state)
+        final_game_state = self._complete_game(client, game_id, player1_id, player2_id, game_state)
         
         # TODO #6: Verify ELO updates
-        self._verify_elo_updates(api_client, player1_id, player2_id, final_game_state)
+        self._verify_elo_updates(client, player1_id, player2_id, final_game_state)
+    
+    def _test_game_resignation(self, test_db, client):
+        """Test that a player can resign from a game."""
+        # Create two players
+        player1_data = {
+            "username": "resign_player1",
+            "email": "resign1@example.com",
+            "level": "INTERMEDIATE",
+            "timezone": "America/Los_Angeles",
+            "country": "US"
+        }
         
+        player2_data = {
+            "username": "resign_player2",
+            "email": "resign2@example.com",
+            "level": "INTERMEDIATE",
+            "timezone": "America/New_York",
+            "country": "US"
+        }
+        
+        # Create player 1
+        response = client.signup(player1_data)
+        assert response.status_code == 200
+        player1_id = response.json()["id"]
+        
+        # Create player 2
+        response = client.signup(player2_data)
+        assert response.status_code == 200
+        player2_id = response.json()["id"]
+        
+        # Create a game
+        # Try to use the API endpoint first, but fall back to direct creation if needed
+        try:
+            response = client.create_game(player1_id, player2_id)
+            if response.status_code == 200:
+                game_id = response.json()["id"]
+            else:
+                raise Exception("API game creation failed")
+        except:
+            # Fall back to direct creation
+            game = client.direct_game_creation(player1_id, player2_id)
+            game_id = game.id
+        
+        # Player O resigns
+        response = client.resign_game(game_id, player2_id)
+        assert response.status_code == 200
+        game_state = response.json()
+        
+        # Verify game state
+        assert game_state["game_over"] == True
+        assert game_state["winner"] == "X"
+        assert game_state["player_x"]["elo_change"] is not None
+        assert game_state["player_o"]["elo_change"] is not None
+        
+        # Check that player stats were updated via profiles
+        response = client.get_profile(player1_id)
+        assert response.status_code == 200
+        player1_profile = response.json()
+        
+        response = client.get_profile(player2_id)
+        assert response.status_code == 200
+        player2_profile = response.json()
+        
+        assert player1_profile["stats"]["wins"] == 1
+        assert player2_profile["stats"]["losses"] == 1
+
+
+@pytest.mark.e2e
+class TestEndToEndRegressionWithTestClient(TestEndToEndRegressionBase):
+    """End-to-end regression test using the FastAPI TestClient.
+    
+    This test runs with the in-process TestClient for fast execution.
+    """
+    
+    def test_full_game_flow_with_test_client(self, test_db, test_client):
+        """Run the full game flow using the TestClient."""
+        print("\n🔵 Running regression test with FastAPI TestClient (in-process)")
+        self.run_full_game_flow(test_db, test_client)
+        print("\n✅ TestClient regression test completed successfully!")
+    
+    def test_game_resignation_with_test_client(self, test_db, test_client):
+        """Test that a player can resign from a game using TestClient."""
+        print("\n🔵 Running game resignation test with FastAPI TestClient (in-process)")
+        self._test_game_resignation(test_db, test_client)
+        print("\n✅ TestClient game resignation test completed successfully!")
+
+
+@pytest.mark.e2e
+@pytest.mark.http
+class TestEndToEndRegressionWithHttpClient(TestEndToEndRegressionBase):
+    """End-to-end regression test using a real HTTP client.
+    
+    This test runs against a real server for true end-to-end testing.
+    """
+    
+    def test_full_game_flow_with_http_client(self, test_db, http_client):
+        """Run the full game flow using the HTTP client against a real server."""
+        print("\n🔴 Running regression test with real HTTP client (end-to-end)")
+        self.run_full_game_flow(test_db, http_client)
+        print("\n✅ HTTP client regression test completed successfully!")
+    
+    def test_game_resignation_with_http_client(self, test_db, http_client):
+        """Test that a player can resign from a game using HTTP client."""
+        print("\n🔴 Running game resignation test with real HTTP client (end-to-end)")
+        self._test_game_resignation(test_db, http_client)
+        print("\n✅ HTTP client game resignation test completed successfully!")
+
+
+# Include all the original test methods below - _create_users_and_verify, etc.
     def _create_users_and_verify(self, api_client):
         """
         TODO #1: Create users and verify their profiles.
@@ -274,6 +382,7 @@ class TestEndToEndRegression:
         - Continue playing valid moves
         
         Args:
+            api_client: The API client to use for HTTP requests
             game_id: ID of the game
             player1_id: ID of player X
             player2_id: ID of player O
@@ -538,7 +647,7 @@ class TestEndToEndRegression:
         assert game_state["current_player"] == "X"  # Turn changed to X
         assert game_state["boards"][2][2] == "O"  # O is placed in top-right of board 2
         
-        # O has now won board 2 by completing the top row (positions 0, 1, 2)
+        # O has now won board, 2 by completing the top row (positions 0, 1, 2)
         # So next_board should be None (free choice for X)
         assert game_state["meta_board"][2] == "O", "Board 2 should be won by O after move 22"
         assert game_state["next_board"] is None, "Next board should be None since board 2 is won by O"
@@ -584,6 +693,7 @@ class TestEndToEndRegression:
         - Check that the game_over flag is set to True
         
         Args:
+            api_client: The API client to use for HTTP requests
             game_id: ID of the game
             player1_id: ID of player X
             player2_id: ID of player O
@@ -915,68 +1025,3 @@ class TestEndToEndRegression:
         assert player2_profile["stats"]["elo"] == expected_player2_elo, "Player O final ELO should match initial ELO + change"
         
         logger.info("Successfully completed TODO #6")
-    
-    def test_game_resignation(self, test_db, api_client):
-        """Test that a player can resign from a game."""
-        # Create two players
-        player1_data = {
-            "username": "resign_player1",
-            "email": "resign1@example.com",
-            "level": "INTERMEDIATE",
-            "timezone": "America/Los_Angeles",
-            "country": "US"
-        }
-        
-        player2_data = {
-            "username": "resign_player2",
-            "email": "resign2@example.com",
-            "level": "INTERMEDIATE",
-            "timezone": "America/New_York",
-            "country": "US"
-        }
-        
-        # Create player 1
-        response = api_client.signup(player1_data)
-        assert response.status_code == 200
-        player1_id = response.json()["id"]
-        
-        # Create player 2
-        response = api_client.signup(player2_data)
-        assert response.status_code == 200
-        player2_id = response.json()["id"]
-        
-        # Create a game
-        # Try to use the API endpoint first, but fall back to direct creation if needed
-        try:
-            response = api_client.create_game(player1_id, player2_id)
-            if response.status_code == 200:
-                game_id = response.json()["id"]
-            else:
-                raise Exception("API game creation failed")
-        except:
-            # Fall back to direct creation
-            game = api_client.direct_game_creation(player1_id, player2_id)
-            game_id = game.id
-        
-        # Player O resigns
-        response = api_client.resign_game(game_id, player2_id)
-        assert response.status_code == 200
-        game_state = response.json()
-        
-        # Verify game state
-        assert game_state["game_over"] == True
-        assert game_state["winner"] == "X"
-        assert game_state["player_x"]["elo_change"] is not None
-        assert game_state["player_o"]["elo_change"] is not None
-        
-        # Check that player stats were updated via profiles
-        response = api_client.get_profile(player1_id)
-        assert response.status_code == 200
-        player1_profile = response.json()
-        
-        response = api_client.get_profile(player2_id)
-        assert response.status_code == 200
-        player2_profile = response.json()
-        
-        assert player1_profile["stats"]["wins"] == 1
-        assert player2_profile["stats"]["losses"] == 1
