@@ -202,19 +202,77 @@ def test_client(no_backend_server, monkeypatch):
             )
         
         def direct_game_creation(self, player_x_id, player_o_id):
-            """Create a game directly (test helper)."""
-            # Since we're in-process, we can create a Game object directly
-            # This wouldn't be possible with a real HTTP client
-            player_x = Player.get(Player.id == player_x_id)
-            player_o = Player.get(Player.id == player_o_id)
-            game = Game.create(
-                player_x=player_x,
-                player_o=player_o,
-                current_player="X",
-                last_move_time=datetime.datetime.now(),
-                started=True
+            """Create a game through matchmaking like a real client would.
+            
+            This method creates a game using the matchmaking API, just like
+            the frontend would, without any direct database access.
+            """
+            print("Creating game through matchmaking system...")
+            import time
+            
+            # Have both players join matchmaking
+            response = self.client.post(
+                "/matchmaking/join",
+                json={"player_id": player_x_id}
             )
-            return game
+            if response.status_code != 200:
+                raise Exception(f"Failed to add first player to matchmaking: {response.status_code}")
+                
+            response = self.client.post(
+                "/matchmaking/join", 
+                json={"player_id": player_o_id}
+            )
+            if response.status_code != 200:
+                # Cancel first player to clean up
+                self.client.post("/matchmaking/cancel", json={"player_id": player_x_id})
+                raise Exception(f"Failed to add second player to matchmaking: {response.status_code}")
+            
+            # Poll for match with first player
+            game_id = None
+            for _ in range(10):  # Try 10 times
+                response = self.client.post(
+                    "/matchmaking/ping",
+                    json={"player_id": player_x_id}
+                )
+                if response.status_code != 200:
+                    continue
+                    
+                data = response.json()
+                if data["status"] == "waiting_acceptance" or data["status"] == "matched":
+                    # Also ping with second player to accept match
+                    self.client.post(
+                        "/matchmaking/ping",
+                        json={"player_id": player_o_id}
+                    )
+                    
+                if data["status"] == "matched" and data["game_id"]:
+                    game_id = data["game_id"]
+                    break
+                    
+                time.sleep(0.5)
+                
+            if not game_id:
+                # Cancel both players to clean up
+                self.client.post("/matchmaking/cancel", json={"player_id": player_x_id})
+                self.client.post("/matchmaking/cancel", json={"player_id": player_o_id})
+                raise Exception("Failed to create game through matchmaking after 10 attempts")
+                
+            # Get the game details to find out which player is X
+            response = self.client.get(f"/games/{game_id}")
+            if response.status_code != 200:
+                raise Exception(f"Failed to get game details: {response.status_code}")
+                
+            # Find out who is player X in this game
+            game_details = response.json()
+            actual_player_x_id = game_details["player_x"]["id"]
+                
+            # Mark the game as ready - must be done by the actual player X
+            response = self.client.post(f"/games/{game_id}/ready?player_id={actual_player_x_id}")
+            if response.status_code != 200:
+                raise Exception(f"Failed to mark game as ready: {response.status_code}")
+                
+            # Return game info in the same format expected by the test
+            return {"id": game_id}
         
         def resign_game(self, game_id, player_id):
             return self.client.post(f"/games/{game_id}/resign?player_id={player_id}")

@@ -118,8 +118,8 @@ def _create_game_and_verify(client, player1_id, player2_id):
         # If no API endpoint, use the direct method in our wrapper
         # This works for the TestClientWrapper but not for real HTTP clients
         try:
-            game = client.direct_game_creation(player1_id, player2_id)
-            game_id = game.id
+            game_data = client.direct_game_creation(player1_id, player2_id)
+            game_id = game_data["id"]
             logger.info(f"Created game with ID: {game_id} through direct creation")
         except Exception as e:
             # This would fail with a real HTTP client without a create endpoint
@@ -137,8 +137,16 @@ def _create_game_and_verify(client, player1_id, player2_id):
     assert game_state["next_board"] is None  # No next_board constraint at the start
     assert game_state["winner"] is None
     assert game_state["game_over"] == False
-    assert game_state["player_x"]["id"] == player1_id
-    assert game_state["player_o"]["id"] == player2_id
+    
+    # With matchmaking, roles (X/O) are assigned randomly, so we need to be flexible
+    # about which player is X and which is O. We'll store them for later use.
+    actual_player_x_id = game_state["player_x"]["id"]
+    actual_player_o_id = game_state["player_o"]["id"]
+    
+    # Make sure both players are in the game
+    assert actual_player_x_id in [player1_id, player2_id]
+    assert actual_player_o_id in [player1_id, player2_id]
+    assert actual_player_x_id != actual_player_o_id  # Sanity check
     assert len(game_state["boards"]) == 9  # 9 sub-boards
     assert len(game_state["meta_board"]) == 9  # meta-board tracking sub-board wins
     
@@ -150,7 +158,8 @@ def _create_game_and_verify(client, player1_id, player2_id):
     assert all(cell == "" for cell in game_state["meta_board"])
     
     logger.info("Successfully completed TODO #2")
-    return game_id
+    # Return the game ID and the actual player X and O IDs
+    return game_id, actual_player_x_id, actual_player_o_id
     
 def _play_initial_moves(client, game_id, player1_id, player2_id):
     """
@@ -827,7 +836,7 @@ def _complete_game(client, game_id, player1_id, player2_id, game_state):
     logger.info("Successfully completed TODO #5")
     return game_state
     
-def _verify_elo_updates(client, player1_id, player2_id, game_state):
+def _verify_elo_updates(client, player1_id, player2_id, game_state, player_x_won=False):
     """
     TODO #6: Verify ELO updates after game completion.
     
@@ -837,9 +846,10 @@ def _verify_elo_updates(client, player1_id, player2_id, game_state):
     
     Args:
         client: The API client to use for HTTP requests
-        player1_id: ID of player X
-        player2_id: ID of player O
+        player1_id: ID of first player (original order)
+        player2_id: ID of second player (original order)
         game_state: The final game state after game completion
+        player_x_won: Whether player X won the game
     """
     logger.info("Starting TODO #6: Verify ELO updates")
     
@@ -862,25 +872,62 @@ def _verify_elo_updates(client, player1_id, player2_id, game_state):
     logger.info(f"Player X (player1) final ELO: {player1_profile['stats']['elo']}")
     logger.info(f"Player O (player2) final ELO: {player2_profile['stats']['elo']}")
     
-    # The winner was O (player2), so player2's ELO should have increased
-    # and player1's ELO should have decreased
-    assert game_state["player_o"]["elo_change"] > 0, "Winner (Player O) should have positive ELO change"
-    assert game_state["player_x"]["elo_change"] < 0, "Loser (Player X) should have negative ELO change"
+    # Check ELO changes based on who won
+    if player_x_won:
+        assert game_state["player_x"]["elo_change"] > 0, "Winner (Player X) should have positive ELO change"
+        assert game_state["player_o"]["elo_change"] < 0, "Loser (Player O) should have negative ELO change"
+        
+        # Check which player was X and which was O
+        player_x_id = game_state["player_x"]["id"]
+        player_o_id = game_state["player_o"]["id"]
+        
+        # Verify win/loss counts based on player assignments
+        if player_x_id == player1_id:  # player1 is X and won
+            assert player1_profile["stats"]["wins"] == 1, "Player 1 (X) should have 1 win"
+            assert player1_profile["stats"]["losses"] == 0, "Player 1 (X) should have 0 losses"
+            assert player2_profile["stats"]["wins"] == 0, "Player 2 (O) should have 0 wins"
+            assert player2_profile["stats"]["losses"] == 1, "Player 2 (O) should have 1 loss"
+        else:  # player2 is X and won
+            assert player2_profile["stats"]["wins"] == 1, "Player 2 (X) should have 1 win"
+            assert player2_profile["stats"]["losses"] == 0, "Player 2 (X) should have 0 losses"
+            assert player1_profile["stats"]["wins"] == 0, "Player 1 (O) should have 0 wins"
+            assert player1_profile["stats"]["losses"] == 1, "Player 1 (O) should have 1 loss"
+    else:  # Player O won
+        assert game_state["player_o"]["elo_change"] > 0, "Winner (Player O) should have positive ELO change"
+        assert game_state["player_x"]["elo_change"] < 0, "Loser (Player X) should have negative ELO change"
+        
+        # Check which player was X and which was O
+        player_x_id = game_state["player_x"]["id"]
+        player_o_id = game_state["player_o"]["id"]
+        
+        # Verify win/loss counts based on player assignments
+        if player_o_id == player1_id:  # player1 is O and won
+            assert player1_profile["stats"]["wins"] == 1, "Player 1 (O) should have 1 win"
+            assert player1_profile["stats"]["losses"] == 0, "Player 1 (O) should have 0 losses"
+            assert player2_profile["stats"]["wins"] == 0, "Player 2 (X) should have 0 wins"
+            assert player2_profile["stats"]["losses"] == 1, "Player 2 (X) should have 1 loss"
+        else:  # player2 is O and won
+            assert player2_profile["stats"]["wins"] == 1, "Player 2 (O) should have 1 win"
+            assert player2_profile["stats"]["losses"] == 0, "Player 2 (O) should have 0 losses"
+            assert player1_profile["stats"]["wins"] == 0, "Player 1 (X) should have 0 wins"
+            assert player1_profile["stats"]["losses"] == 1, "Player 1 (X) should have 1 loss"
     
-    # Verify win/loss counts
-    assert player1_profile["stats"]["losses"] == 1, "Player X should have 1 loss"
-    assert player1_profile["stats"]["wins"] == 0, "Player X should have 0 wins"
+    # Calculate expected final ELOs based on player assignments
+    player_x_id = game_state["player_x"]["id"]
+    player_o_id = game_state["player_o"]["id"]
     
-    assert player2_profile["stats"]["wins"] == 1, "Player O should have 1 win"
-    assert player2_profile["stats"]["losses"] == 0, "Player O should have 0 losses"
+    player1_elo_change = game_state["player_x"]["elo_change"] if player_x_id == player1_id else game_state["player_o"]["elo_change"]
+    player2_elo_change = game_state["player_o"]["elo_change"] if player_o_id == player2_id else game_state["player_x"]["elo_change"]
     
-    # Calculate expected final ELOs
-    expected_player1_elo = 700 + game_state["player_x"]["elo_change"]  # Initial ELO (INTERMEDIATE) + change
-    expected_player2_elo = 400 + game_state["player_o"]["elo_change"]  # Initial ELO (BEGINNER) + change
+    # Expected starting ELOs based on skill level
+    # player1 has "INTERMEDIATE" level = 700 ELO
+    # player2 has "BEGINNER" level = 400 ELO
+    expected_player1_elo = 700 + player1_elo_change
+    expected_player2_elo = 400 + player2_elo_change
     
     # Verify final ELOs match the calculated values
-    assert player1_profile["stats"]["elo"] == expected_player1_elo, "Player X final ELO should match initial ELO + change"
-    assert player2_profile["stats"]["elo"] == expected_player2_elo, "Player O final ELO should match initial ELO + change"
+    assert player1_profile["stats"]["elo"] == expected_player1_elo, "Player 1 final ELO should match initial ELO + change"
+    assert player2_profile["stats"]["elo"] == expected_player2_elo, "Player 2 final ELO should match initial ELO + change"
     
     logger.info("Successfully completed TODO #6")
 
@@ -927,11 +974,20 @@ def _test_game_resignation(client, test_db):
             raise Exception("API game creation failed")
     except:
         # Fall back to direct creation
-        game = client.direct_game_creation(player1_id, player2_id)
-        game_id = game.id
+        game_data = client.direct_game_creation(player1_id, player2_id)
+        game_id = game_data["id"]
     
-    # Player O resigns
-    response = client.resign_game(game_id, player2_id)
+    # Get the game details to find out which player is which
+    response = client.get_game(game_id)
+    assert response.status_code == 200
+    game_details = response.json()
+    
+    # Find out who is player X and who is player O
+    player_x_id = game_details["player_x"]["id"]
+    player_o_id = game_details["player_o"]["id"]
+    
+    # Player O resigns - use the actual player O
+    response = client.resign_game(game_id, player_o_id)
     assert response.status_code == 200
     game_state = response.json()
     
@@ -950,8 +1006,13 @@ def _test_game_resignation(client, test_db):
     assert response.status_code == 200
     player2_profile = response.json()
     
-    assert player1_profile["stats"]["wins"] == 1
-    assert player2_profile["stats"]["losses"] == 1
+    # Check which player should have won based on roles
+    if player_x_id == player1_id:  # player1 was X and won
+        assert player1_profile["stats"]["wins"] == 1, "Player 1 (X) should have 1 win"
+        assert player2_profile["stats"]["losses"] == 1, "Player 2 (O) should have 1 loss"
+    else:  # player2 was X and won
+        assert player2_profile["stats"]["wins"] == 1, "Player 2 (X) should have 1 win"
+        assert player1_profile["stats"]["losses"] == 1, "Player 1 (O) should have 1 loss"
 
 def run_full_game_flow(test_db, client):
     """
@@ -970,19 +1031,23 @@ def run_full_game_flow(test_db, client):
     player1_id, player2_id = _create_users_and_verify(client)
     
     # TODO #2: Game creation
-    game_id = _create_game_and_verify(client, player1_id, player2_id)
+    # This returns the game_id and the assigned player IDs (which may be swapped from original)
+    game_id, player_x_id, player_o_id = _create_game_and_verify(client, player1_id, player2_id)
     
-    # TODO #3: Play initial moves
-    _play_initial_moves(client, game_id, player1_id, player2_id)
+    # TODO #3: Play initial moves - use actual X and O IDs from matchmaking
+    _play_initial_moves(client, game_id, player_x_id, player_o_id)
     
-    # TODO #4: Win a sub-board
-    game_state = _win_subboard(client, game_id, player1_id, player2_id)
+    # TODO #4: Win a sub-board - use actual X and O IDs from matchmaking
+    game_state = _win_subboard(client, game_id, player_x_id, player_o_id)
     
-    # TODO #5: Complete the game
-    final_game_state = _complete_game(client, game_id, player1_id, player2_id, game_state)
+    # TODO #5: Complete the game - use actual X and O IDs from matchmaking
+    final_game_state = _complete_game(client, game_id, player_x_id, player_o_id, game_state)
     
     # TODO #6: Verify ELO updates
-    _verify_elo_updates(client, player1_id, player2_id, final_game_state)
+    # Here we pass the original player1_id and player2_id for profile checks
+    # but also pass the assigned roles so the test knows which player won
+    _verify_elo_updates(client, player1_id, player2_id, final_game_state, 
+                        player_x_won=(final_game_state["winner"] == "X"))
 
 @pytest.mark.e2e
 class TestEndToEndRegressionWithTestClient:

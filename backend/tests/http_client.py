@@ -56,21 +56,82 @@ class ApiClient:
         )
     
     def direct_game_creation(self, player_x_id, player_o_id):
-        """Create a game directly (API-only fallback).
+        """Create a game through the matchmaking system.
         
         For the HTTP client, we don't have access to the database directly,
-        so we fall back to the create_game API method, and if that fails,
-        we raise an error with a helpful message.
+        so we use the matchmaking system to create a game, like a real frontend client would.
         """
+        # First try the direct API endpoint
         response = self.create_game(player_x_id, player_o_id)
-        if response.status_code != 200:
-            raise Exception(
-                f"Failed to create game via API: {response.status_code}\n"
-                f"For HTTP client, you need a '/games/create' API endpoint.\n"
-                f"Please implement this endpoint or use the test_client fixture instead."
-            )
+        if response.status_code == 200:
+            return response.json()
             
-        return response.json()
+        print("No direct games/create endpoint available. Using matchmaking system...")
+        import time
+        
+        # Have both players join matchmaking
+        response = self.session.post(
+            f"{self.base_url}/matchmaking/join",
+            json={"player_id": player_x_id}
+        )
+        if response.status_code != 200:
+            raise Exception(f"Failed to add first player to matchmaking: {response.status_code}")
+            
+        response = self.session.post(
+            f"{self.base_url}/matchmaking/join", 
+            json={"player_id": player_o_id}
+        )
+        if response.status_code != 200:
+            # Cancel first player to clean up
+            self.session.post(f"{self.base_url}/matchmaking/cancel", json={"player_id": player_x_id})
+            raise Exception(f"Failed to add second player to matchmaking: {response.status_code}")
+        
+        # Poll for match with first player
+        game_id = None
+        for _ in range(10):  # Try 10 times
+            response = self.session.post(
+                f"{self.base_url}/matchmaking/ping",
+                json={"player_id": player_x_id}
+            )
+            if response.status_code != 200:
+                continue
+                
+            data = response.json()
+            if data["status"] == "waiting_acceptance" or data["status"] == "matched":
+                # Also ping with second player to accept match
+                self.session.post(
+                    f"{self.base_url}/matchmaking/ping",
+                    json={"player_id": player_o_id}
+                )
+                
+            if data["status"] == "matched" and data["game_id"]:
+                game_id = data["game_id"]
+                break
+                
+            time.sleep(0.5)
+            
+        if not game_id:
+            # Cancel both players to clean up
+            self.session.post(f"{self.base_url}/matchmaking/cancel", json={"player_id": player_x_id})
+            self.session.post(f"{self.base_url}/matchmaking/cancel", json={"player_id": player_o_id})
+            raise Exception("Failed to create game through matchmaking after 10 attempts")
+            
+        # Get the game details to find out which player is X
+        response = self.session.get(f"{self.base_url}/games/{game_id}")
+        if response.status_code != 200:
+            raise Exception(f"Failed to get game details: {response.status_code}")
+            
+        # Find out who is player X in this game
+        game_details = response.json()
+        actual_player_x_id = game_details["player_x"]["id"]
+            
+        # Mark the game as ready - must be done by the actual player X
+        response = self.session.post(f"{self.base_url}/games/{game_id}/ready?player_id={actual_player_x_id}")
+        if response.status_code != 200:
+            raise Exception(f"Failed to mark game as ready: {response.status_code}")
+            
+        # Return game info in the same format as the create_game endpoint would
+        return {"id": game_id}
     
     def resign_game(self, game_id, player_id):
         """Resign from a game."""
