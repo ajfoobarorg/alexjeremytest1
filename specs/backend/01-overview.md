@@ -44,3 +44,4 @@ The remaining specifications cover:
 3. Game Logic - Implementation details for game rules
 4. Matchmaking - Specification for the matchmaking system
 5. Authentication - User authentication and session management
+6. Validation - TODO
